@@ -1,6 +1,5 @@
 % analyze category behavior, without any neural data
 
-
 %% Load data
 clearvars
 close all
