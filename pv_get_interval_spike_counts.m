@@ -35,11 +35,12 @@ end
 %% Prepare list of intervals
 first_time = -100;
 last_time = 450;
+width = 100;
 step = 5;
 starts = first_time:step:last_time;
 rIntervals = cell(1, length(starts)); % "relevant Intervals"
 for i = 1:length(starts)
-    rIntervals{i} = [starts(i) (starts(i) + step)];
+    rIntervals{i} = [starts(i) (starts(i) + width)];
 end
 
 %% Collect spike count data for all neurons
@@ -70,25 +71,26 @@ for m = 2
         % cue-on.
         X = zeros(length(catg1_timeson)+length(catg2_timeson), length(rUnits), length(rIntervals));
             
-        for p = 1:length(rIntervals)
-            interval = rIntervals{p};
+        for j = 1:length(rUnits)
+            unit = rUnits(j);
             
-            for j = 1:length(rUnits)
-                % Collect all spike times
-                unit = rUnits(j);
-                allspike_times = sort(Monkeys(m).Sessions(sessn).UnitInfo(unit).Spike_times);
+            % Collect all spike times
+            allspike_times = sort(Monkeys(m).Sessions(sessn).UnitInfo(unit).Spike_times);
+            
+            for p = 1:length(rIntervals)
+                interval = rIntervals{p};
                 
                 % Spikes must be sorted!
                 % getSpikesInInt(list of spike times, times catg1 cues on,
                 % times catg2 cues on, current interval relative to cue on). 
                 X(:,j,p) = getSpikesInInt(allspike_times, catg1_timeson, catg2_timeson, interval);
             end
-            fprintf('Done with %s, sessn %d, interval %d \n', Monkeys(m).Name, i, p)
+            fprintf('Done with %s, sessn %d, unit %d \n', Monkeys(m).Name, i, j)
         end
         
         % Generate file name.
         MonkID = sprintf('%s_%s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName);
-        fileName = sprintf('%s_allNeurons.mat', MonkID);
+        fileName = sprintf('%s_allNeurons_step%d_wd%d.mat', MonkID, step, width);
         
         % Check if file will be too big. If so, split it.
         t = whos('X');
