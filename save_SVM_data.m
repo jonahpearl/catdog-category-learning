@@ -42,7 +42,7 @@ fields = fieldnames(Record);
 % Generate large random number ID for this set of parameters
 flag = 0;
 while flag == 0
-    id = 1e6*rand(1);
+    id = round(1e6*rand(1));
     if ~ismember(id, [Record.ID])
         flag = 1;
     end 
