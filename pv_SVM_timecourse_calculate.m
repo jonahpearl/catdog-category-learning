@@ -37,12 +37,12 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 
 % SVM Parameters
 random_seed = 10; % for reproducibility 
-% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
-rArrayLocs = {'te'};
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
+% rArrayLocs = {'te'};
 rSessionsByMonk = {[7 9], [6 7]};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
 runShuffle = true; % run the shuffled condition?
-matchInputSizes = false; % make input matrices all same size (control) ?
+matchInputSizes = true; % make input matrices all same size (control) ?
     % These parameters only used if matching input sizes. If false, these
     % parameters are automatically set to NaN, NaN, and 1.
     proportion_of_min_pop_size = 0.75; 
@@ -143,7 +143,7 @@ for m = 1:length(Monkeys)
     
     % Match input sizes if requested
     if matchInputSizes
-        [numUnitsCell, numTrials] = getMatchedInputSizes(Monkeys(m).Sessions, ...
+        [numUnitsVec, numTrials] = getMatchedInputSizes(Monkeys(m).Sessions, ...
             rSessions, rArrayLocs, ...
             proportion_of_min_pop_size, proportion_of_min_trials);
     else 
@@ -156,7 +156,7 @@ for m = 1:length(Monkeys)
         % Get data from appropriate storage place
         MonkID = sprintf('%s_%s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName);
         fileName = sprintf('%s_allNeurons_step%d_wd%d.mat', MonkID, step, width);
-        [X, rIntervals] = load_interval_data(fullfile(EXT_HD, spikeCountPath, fileName)); % X is spike counts, rIntervals is list of each interval
+        [X_full, rIntervals] = load_interval_data(fullfile(EXT_HD, spikeCountPath, fileName)); % X is spike counts, rIntervals is list of each interval
         Y = Monkeys(m).Sessions(sessn).Session_Y_catg; % list of categories for each image in X (1 or 2)
         unitBools = Monkeys(m).Sessions(sessn).SVMBools; % cell array of boolean for units to use for each loc
         
@@ -164,7 +164,7 @@ for m = 1:length(Monkeys)
             loc = rArrayLocs{iLoc};
             locBools = unitBools{iLoc};
             if matchInputSizes
-                numUnits = numUnitsCell{iLoc}; % correct minimum-adjusted number of units across sessions for this array location.
+                numUnits = numUnitsVec(iLoc); % correct minimum-adjusted number of units across sessions for this array location.
             end
             
             % Catch subsets with no data
@@ -174,7 +174,7 @@ for m = 1:length(Monkeys)
             end
             
             % Take the correct units.
-            X = X(:, locBools, :);
+            X = X_full(:, locBools, :);
             
             
             for iInt = 1:length(rIntervals)
@@ -264,9 +264,9 @@ end
 %% Save the data
 
 % Remove unecessary fields
-% for m = 1:length(Monkeys)
-%     Monkeys(m).Sessions = rmfield(Monkeys(m).Sessions, {'UnitInfo', 'CueInfo', 'TrialInfo', 'TimesBT', 'CodesBT', 'Fixn_err_TC'});
-% end
+for m = 1:length(Monkeys)
+    Monkeys(m).Sessions = rmfield(Monkeys(m).Sessions, {'UnitInfo', 'CueInfo', 'TrialInfo', 'TimesBT', 'CodesBT', 'Fixn_err_TC'});
+end
 
 % Save the data and add a row to the Record
 fullSVMPath = fullfile(EXT_HD, pv_path, 'SVM_results_%g.mat');

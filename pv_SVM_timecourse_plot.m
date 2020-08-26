@@ -1,6 +1,6 @@
 % plot SVM timecourse results
 
-%% Paramd and load SVM record
+%% Params and load SVM record
 clearvars
 close all
 
@@ -19,18 +19,23 @@ load(fullRecordPath, 'Record');
 load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior and neural summaries, but w/o spike times
 
 %% Find desired SVM data
-
-ID = 439280;
+% ID = 570049; % matching at 75%, te and the three individual arrays, with shuffle.
+% ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
+% ID = 439280; % no matching, te, with shuffle.
+ID = 317849; % no matching, anterior, middle, posterior, with shuffle.
 fNames = fields(Record);
 row = find([Record.ID] == ID);
 for f = 1:length(fNames)
     s = Record(row).(fNames{f});
-    if strcmp(fNames{f}, 'MatchInputParams')
-        fprintf('%s: %s \n', fNames{f}, mat2str(s))
-    elseif strcmp(fNames{f}, 'SessionsUsed')
-        fprintf('%s: %s--%s, %s--%s \n', fNames{f}, Monkeys(1).Name, mat2str(s{1}), Monkeys(2).Name, mat2str(s{2}))
+    field = fNames{f};
+    if strcmp(field, 'MatchInputParams')
+        fprintf('%s: %s \n', field, mat2str(s))
+    elseif strcmp(field, 'SessionsUsed')
+        fprintf('%s: %s--%s, %s--%s \n', field, Monkeys(1).Name, mat2str(s{1}), Monkeys(2).Name, mat2str(s{2}))
+    elseif isa(s, 'cell')
+        fprintf('%s: %s \n', field, join(cellfun(@string ,s), ', '))
     else
-        fprintf('%s: %s \n', fNames{f}, string(s))
+        fprintf('%s: %s \n', field, string(s))
     end
     
 end
@@ -55,9 +60,9 @@ end
 
 % Choose what to plot
 rSessionsByMonk = {[7 9] [6 7]};
-rArrayLocs = {'SHUFFLE_te', 'te'}; % just treat shuffle as a separate loc, will be easier.
-
-
+% rArrayLocs = {'SHUFFLE_te', 'te'}; % just treat shuffle as a separate loc, will be easier.
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; % just treat shuffle as a separate loc, will be easier.
+rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; % just treat shuffle as a separate loc, will be easier.
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     
@@ -74,7 +79,7 @@ for m = 1:length(Monkeys)
         loc = rArrayLocs{iLoc};
         
         % New subplot for each array location
-        subplot(1, length(rArrayLocs), iLoc)
+        subplot(2, length(rArrayLocs)/2, iLoc)
         hold on
         
         for i = 1:length(rSessions)
