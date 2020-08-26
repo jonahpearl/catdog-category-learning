@@ -37,12 +37,13 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 
 % SVM Parameters
 random_seed = 10; % for reproducibility 
-rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
-% rArrayLocs = {'te'};
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
+rArrayLocs = {'te'};
 rSessionsByMonk = {[7 9], [6 7]};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
 runShuffle = true; % run the shuffled condition?
-matchInputSizes = true; % make input matrices all same size (control) ?
+    nShuffles = 100;
+matchInputSizes = false; % make input matrices all same size (control) ?
     % These parameters only used if matching input sizes. If false, these
     % parameters are automatically set to NaN, NaN, and 1.
     proportion_of_min_pop_size = 0.75; 
@@ -184,7 +185,7 @@ for m = 1:length(Monkeys)
                 kflValues = zeros(nRandomSubsamples*kfold_num,1);
                 iK = 1;
                 if runShuffle
-                    kflValues_SHUFFLE = zeros(nRandomSubsamples*kfold_num,1);
+                    kflValues_SHUFFLE = zeros(nRandomSubsamples*kfold_num, nShuffles);
                 end
                 
                 
@@ -234,11 +235,13 @@ for m = 1:length(Monkeys)
                         
                         % Run with shuffled values if requested
                         if runShuffle
-                            Y_subset_SHUFFLE = Y_subset(randperm(length(Y_subset)));
-                            model_SHUFFLE = fitclinear(X_subset(idx,:), Y_subset_SHUFFLE(idx),'Regularization', 'lasso');
-                            preds_SHUFFLE = predict(model_SHUFFLE, X_subset(~idx,:));
-                            err_SHUFFLE = sum(preds_SHUFFLE ~= Y_subset_SHUFFLE(~idx)) / sum(~idx);
-                            kflValues_SHUFFLE(iK) = err_SHUFFLE;
+                            for iShuff = 1:nShuffles
+                                Y_subset_SHUFFLE = Y_subset(randperm(length(Y_subset)));
+                                model_SHUFFLE = fitclinear(X_subset(idx,:), Y_subset_SHUFFLE(idx),'Regularization', 'lasso');
+                                preds_SHUFFLE = predict(model_SHUFFLE, X_subset(~idx,:));
+                                err_SHUFFLE = sum(preds_SHUFFLE ~= Y_subset_SHUFFLE(~idx)) / sum(~idx);
+                                kflValues_SHUFFLE(iK, iShuff) = err_SHUFFLE;
+                            end
                         end
                         
                         % Iterate.
