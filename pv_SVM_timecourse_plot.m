@@ -10,6 +10,7 @@ CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 svmRecordPath = 'XMA2/Monkey_structs/SVM_Records.mat';
 pv_path = 'XMA2/Monkey_structs';
 fullSVMPath = fullfile(EXT_HD, pv_path, 'SVM_results_%g.mat');
+figureSavePath = '/Users/jonahpearl/Documents/BJR group/Catdog paper/';
 
 % Load record
 fullRecordPath = fullfile(EXT_HD, svmRecordPath);
@@ -18,11 +19,16 @@ load(fullRecordPath, 'Record');
 % Load behavioral data
 load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior and neural summaries, but w/o spike times
 
+% Statistics parameters
+cluster_alpha = 0.05;
+
 %% Find desired SVM data
-% ID = 570049; % matching at 75%, te and the three individual arrays, with shuffle.
+% ID = 570049; % te and the three individual arrays, matching at 75%, with shuffle.
 % ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
-ID = 439280; % no matching, te, with shuffle.
-% ID = 317849; % no matching, anterior, middle, posterior, with shuffle.
+% ID = 439280; % te, no matching, with 5x shuffle.
+ID = 958736; % te, no matching, with 100x shuffle
+% ID = 317849; % anterior, middle, posterior, no matching, with shuffle.
+
 fNames = fields(Record);
 row = find([Record.ID] == ID);
 for f = 1:length(fNames)
@@ -59,7 +65,8 @@ end
 %% Choose what to plot
 
 rSessionsByMonk = {[7 9] [6 7]};
-rArrayLocs = {'te', 'SHUFFLE_te'}; % just treat shuffle as a separate loc, will be easier.
+% rArrayLocs = {'te', 'SHUFFLE_te'}; % just treat shuffle as a separate loc, will be easier.
+rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; % just treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; % just treat shuffle as a separate loc, will be easier.
 
@@ -90,7 +97,12 @@ for m = 1:length(Monkeys)
         tStats_SHUFFLED = getshuffledtstats(Data, m, rSessions, loc, rIntervals); % num shuffle permutations x num intervals
         
         % Find real clusters
-        clusterStats = calculateTClusterStats(tStats); % 1 x num clusters vector (num clusters calculated in function)
+        % clusterStats: 1 x num clusters vector (num clusters calculated in
+        % function). Is sorted.
+        % intsInCluster: of the I intervals in rIntervals, which ones are
+        % in each cluster? Sorted to correspond to clusterStats.
+        
+        [clusterStats, intsInCluster] = calculateTClusterStats(tStats); 
         
         % Find shuffled clusters
         nShuff = size(tStats_SHUFFLED,1);
@@ -100,13 +112,29 @@ for m = 1:length(Monkeys)
             clusterStats_SHUFFLED(:,iShuff) = calcShuffClusterStats(tStats_SHUFFLED(iShuff,:), nClust);
         end
         
+        % Take largest from each shuffled cluster to use to create p-values.
+        % (Can also rank-match, so it was worth getting the entire shuffled
+        % cluster vector in case we want to change the pvalue method.)
+        shuffled_vals = clusterStats_SHUFFLED(1,:);
+        
+        % Generate p-values. The transpose with the <= operator makes
+        % MATLAB compare all to all. Love a good one-liner.
+        signf_clusters = find(sum(clusterStats <= shuffled_vals') / numel(shuffled_vals) < cluster_alpha);
+        
+        % Of the intervals in rIntervals, which are significant?
+        signf_ints = [intsInCluster{signf_clusters}];
+        sigID = sprintf('ClustPermSignfInds_Sessions_%d_vs_%d', rSessions(1), rSessions(2));
+        Monkeys(m).(sigID) = signf_ints;
         
     end
 end
+
 %% Plot the data
 
 % Plotting params
 plot_alpha = 0.4; % transparency of sem fill
+mkYLims = {[0.45 0.85], [0.45 0.65]};
+
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -123,7 +151,7 @@ for m = 1:length(Monkeys)
         loc = rArrayLocs{iLoc};
         
         % New subplot for each array location
-        subplot(2, length(rArrayLocs)/2, iLoc)
+%         subplot(2, length(rArrayLocs)/2, iLoc)
         hold on
         
         for i = 1:length(rSessions)
@@ -134,11 +162,11 @@ for m = 1:length(Monkeys)
                 
                 % Get field names
                 kflID = get_good_interval_name2(interval, loc, 'KFL');
-                kflID_shuffle = get_good_interval_name2(interval, loc, 'KFL_SHUFFLE');
-                
+%                 kflID_shuffle = get_good_interval_name2(interval, loc, 'KFL_SHUFFLE');
                 
                 % Get data
                 kfls = Data(m).Sessions(sessn).(kflID);
+                kfls = kfls(:); % reshape into 1 x numel
                 accMeans(i, iInt, iLoc) = mean(1 - kfls);
                 accSems(i, iInt, iLoc) = std(1 - kfls) / numel(kfls);
             end
@@ -156,16 +184,18 @@ for m = 1:length(Monkeys)
                 [meanVector + semVector, fliplr(meanVector - semVector)], mlc(i),...
                 'FaceAlpha', plot_alpha,'linestyle','none');
             
-            % Plot labels
+            % Plot signf inds
+            sigID = sprintf('ClustPermSignfInds_Sessions_%d_vs_%d', rSessions(1), rSessions(2));
+            plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+            
+            % Add labels
             xlabel('Time from cue on (ms)')
             ylabel('SVM accuracy')
             
             % Make graphs have the same y-axes within each monkey
-            if m == 1
-                ylim([0.45 0.85])
-            elseif m == 2
-                ylim([0.45 0.65])
-            end
+            ylim(mkYLims{m})
+            
+            
             
             % Detailed labels if desired
             %             ylabel('SVM abcat accuracy (mean +/- SEM)')
@@ -179,16 +209,16 @@ for m = 1:length(Monkeys)
         % More detailed labels if desired.
         %         sgtitle(sprintf('%s', Monkeys(m).Name), 'Interpreter', 'none')
         
-        
+        % Save the plots
+        saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s.svg', sigID)))
     end
 end
-
 
 %% Functions
 function formatSVMPlot(ax, fig)
 set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
     'XMinorTick', 'off', 'YMinorTick', 'off',...
-    'fontsize',20, 'YGrid', 'on',...
+    'fontsize',28, 'YGrid', 'on',...
     'fontname', 'Helvetica',...
     'XColor', 'black', 'YColor', 'black')
 set(fig, 'Color', 'white')
@@ -228,7 +258,7 @@ function tStats_SHUFFLED = getshuffledtstats(Data, m, rSessions, loc, rIntervals
         s1 = Data(m).Sessions(rSessions(1)).(kflID);
         s2 = Data(m).Sessions(rSessions(2)).(kflID);
         
-        for iShuff = 1:length(nShuffles)
+        for iShuff = 1:nShuffles
             [~,~,~,stats] = ttest2(s1(:,iShuff), s2(:, iShuff), 'Tail', 'both');
             tStats_SHUFFLED(iShuff, iInt) = stats.tstat;
         end
@@ -248,12 +278,15 @@ function clusterStats = calcShuffClusterStats(tStats, nClust)
     end
 end
 
-function clusterStats = calculateTClusterStats(tStats)
+function [clusterStats, intsInCluster] = calculateTClusterStats(tStats)
     starts = [1 find(diff(sign(tStats)))+1];
     ends = [starts(2:end)-1 length(tStats)];
     clusters = cell(1, length(starts));
+    intsInCluster = cell(1, length(starts)); % inds in rIntervals that belong to each cluster, for plotting later
     for iClust = 1:length(clusters)
         clusters{iClust} = tStats(starts(iClust):ends(iClust));
+        intsInCluster{iClust} = starts(iClust):ends(iClust);
     end
-    clusterStats = sort(abs(cellfun(@sum, clusters)), 'descend');
+    [clusterStats, idx] = sort(abs(cellfun(@sum, clusters)), 'descend');
+    intsInCluster = intsInCluster(idx); % sort these to correspond to sorted cluster list
 end
