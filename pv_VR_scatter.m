@@ -263,6 +263,7 @@ for m = 1:length(Monkeys)
         ax.YAxis.Visible = 'off';
         ax.YGrid = 'off';
         ax.XGrid = 'off';
+        ax.XLabel.FontSize = 40;
         
         
     end
@@ -278,14 +279,41 @@ for m = 1:length(Monkeys)
     
 end
 
-saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s.svg', propn_id)))
-saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s.svg', propn_id)))
+% saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
+% saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
+
+%% Draw each histogram separately
+
+for m = 1:length(Monkeys)
+    sessions_to_use = Monkeys(m).Sessions_to_use;
+    diffs = cell(1,length(sessions_to_use));
+    
+    for i = 1:length(sessions_to_use)
+        sessn = sessions_to_use(i);
+        
+        % Get data
+        figure
+        propn_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_CatDogPropns_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
+        slope_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
+        intercept_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Intercept_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
+        t = Monkeys(m).Sessions(sessn).(propn_id);
+        cat_props = t(1,:);
+        dog_props = t(2,:);
+        histogram(dog_props - cat_props, 'BinEdges', -0.2:0.025:0.2)
+        ax = gca;
+        formatPlot(ax, gcf)
+        ax.YAxis.Visible = 'off';
+        ax.YGrid = 'off';
+        ax.XGrid = 'off';
+        saveas(gcf, fullfile(figureSavePath, sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
+    end
+end
 
 %% Functions
 function formatPlot(ax, fig)
 set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
     'XMinorTick', 'off', 'YMinorTick', 'off',...
-    'fontsize',22, 'YGrid', 'on', 'XGrid', 'on',...
+    'fontsize',40, 'YGrid', 'on', 'XGrid', 'on',...
     'fontname', 'Helvetica',...
     'XColor', 'black', 'YColor', 'black')
 set(fig, 'Color', 'white')
