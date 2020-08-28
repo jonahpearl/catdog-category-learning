@@ -210,7 +210,8 @@ for m = 1:length(Monkeys)
         %         sgtitle(sprintf('%s', Monkeys(m).Name), 'Interpreter', 'none')
         
         % Save the plots
-        saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%s.svg', Monkeys(m).Name, sigID)))
+        pause(0.5)
+        saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%s', Monkeys(m).Name, sigID)), 'epsc')
     end
 end
 
