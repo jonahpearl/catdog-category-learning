@@ -191,7 +191,8 @@ hold on
 
 for m = 1:length(Monkeys)
     sessions_to_use = Monkeys(m).Sessions_to_use;
-   
+    diffs = cell(1,length(sessions_to_use));
+    
     for i = 1:length(sessions_to_use)
         sessn = sessions_to_use(i);
         
@@ -205,8 +206,9 @@ for m = 1:length(Monkeys)
         slope = tan(deg2rad(Monkeys(m).Sessions(sessn).(slope_id)(2)));
         intercept = Monkeys(m).Sessions(sessn).(intercept_id)(2);
         xvals = 0:0.01:1;
+        diffs{i} = cat_props - dog_props;
         
-        % Get color / plotting params
+        % ID session name and set some params accordingly.
         switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
             case 'Base'
                 col = epoch_colors(1,:);
@@ -214,11 +216,11 @@ for m = 1:length(Monkeys)
             case 'Pre'
                 col = epoch_colors(2,:);
                 thk = 2;
-                pre_data = perpendicular_residuals;
+                pre_diff_idx = i;
             case 'Post'
                 col = epoch_colors(3,:);
                 thk = 2;
-                post_data = perpendicular_residuals;
+                post_diff_idx = i;
         end
                 
         % Make scatter plot
@@ -264,8 +266,16 @@ for m = 1:length(Monkeys)
         
         
     end
-    %     sgtitle(sprintf('Area %s, %d to %d, image VR propns,(alpha = %0.2f)',...
-    %         area_to_plot, interval_to_plot(1), interval_to_plot(2), vr_alpha), 'Interpreter', 'none')
+    
+%     % Informative sgtitle if desired
+%     sgtitle(sprintf('Area %s, %d to %d, image VR propns,(alpha = %0.2f)',...
+%         area_to_plot, interval_to_plot(1), interval_to_plot(2), vr_alpha), 'Interpreter', 'none')
+
+    % Run variance tests
+    [h,pval] = vartest2(diffs{pre_diff_idx}, diffs{post_diff_idx});
+    fprintf('Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
+            var(diffs{pre_diff_idx}), var(diffs{post_diff_idx}), h, pval)
+    
 end
 
 saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s.svg', propn_id)))
