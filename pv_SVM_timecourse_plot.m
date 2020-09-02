@@ -23,11 +23,14 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 cluster_alpha = 0.05;
 
 %% Find desired SVM data
+
+% Note: need 100x shuffle for permutation testing.
+
 % ID = 570049; % te and the three individual arrays, matching at 75%, with shuffle.
 % ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
 % ID = 439280; % te, no matching, with 5x shuffle.
-ID = 958736; % te, no matching, with 100x shuffle
-% ID = 317849; % anterior, middle, posterior, no matching, with shuffle.
+ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
+% ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -64,18 +67,22 @@ end
 
 %% Choose what to plot
 
+% Choose sessions.
 rSessionsByMonk = {[7 9] [6 7]};
-% rArrayLocs = {'te', 'SHUFFLE_te'}; % just treat shuffle as a separate loc, will be easier.
-rArrayLocs = {'te'};
-% rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; % just treat shuffle as a separate loc, will be easier.
-% rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; % just treat shuffle as a separate loc, will be easier.
 
+% Choose arrays. Treat shuffle as a separate loc, will be easier.
+% rArrayLocs = {'te', 'SHUFFLE_te'}; 
+rArrayLocs = {'te'};
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
+% rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
+% rArrayLocs = {'anterior', 'middle', 'posterior'}; 
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
 
 % This section of code automatically looks at shuffled data -- do not 
 % include in list of locs.
 rArrayLocs_stats = {'te'};
-
+% rArrayLocs_stats = {'anterior', 'middle', 'posterior'};
+    
 % 1. run ttests at each time point
 % 2. Generate clusters and cluster statistics (real and shuffled)
 % 3. Compare ranked statistics from shuffle to real to find pvals (mult
@@ -84,7 +91,7 @@ rArrayLocs_stats = {'te'};
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     if numel(rSessions) ~= 2
-        error('This code expects two sessions to compare')
+        error('Shuffle permutations code expects two sessions to compare')
     end
     
     for iLoc = 1:length(rArrayLocs_stats)
@@ -106,6 +113,9 @@ for m = 1:length(Monkeys)
         
         % Find shuffled clusters
         nShuff = size(tStats_SHUFFLED,1);
+        if nShuff == 1
+            error('Cannot run permutation tests with only one subset of shuffles!')
+        end
         nClust = size(clusterStats,2);
         clusterStats_SHUFFLED = zeros(nClust, nShuff);
         for iShuff = 1:nShuff
@@ -123,13 +133,13 @@ for m = 1:length(Monkeys)
         
         % Of the intervals in rIntervals, which are significant?
         signf_ints = [intsInCluster{signf_clusters}];
-        sigID = sprintf('ClustPermSignfInds_Sessions_%d_vs_%d', rSessions(1), rSessions(2));
+        sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
         Monkeys(m).(sigID) = signf_ints;
         
     end
 end
 
-%% Plot the data
+%% Plot the full timecourse
 
 % Plotting params
 plot_alpha = 0.4; % transparency of sem fill
@@ -151,7 +161,7 @@ for m = 1:length(Monkeys)
         loc = rArrayLocs{iLoc};
         
         % New subplot for each array location
-%         subplot(2, length(rArrayLocs)/2, iLoc)
+%         subplot(2, ceil(length(rArrayLocs)/2), iLoc)
         hold on
         
         for i = 1:length(rSessions)
@@ -162,7 +172,6 @@ for m = 1:length(Monkeys)
                 
                 % Get field names
                 kflID = get_good_interval_name2(interval, loc, 'KFL');
-%                 kflID_shuffle = get_good_interval_name2(interval, loc, 'KFL_SHUFFLE');
                 
                 % Get data
                 kfls = Data(m).Sessions(sessn).(kflID);
@@ -174,7 +183,7 @@ for m = 1:length(Monkeys)
             
             % Simplify variable names
             meanVector = accMeans(i, :, iLoc);
-            semVector = accSems(i, iInt, iLoc);
+            semVector = accSems(i, :, iLoc);
             
             % Plot a line for each session with filled sem.
             % mlc() is a function to get the RGB vals for the default
@@ -185,8 +194,10 @@ for m = 1:length(Monkeys)
                 'FaceAlpha', plot_alpha,'linestyle','none');
             
             % Plot signf inds
-            sigID = sprintf('ClustPermSignfInds_Sessions_%d_vs_%d', rSessions(1), rSessions(2));
-            plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+            sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
+            if ~ isempty(Monkeys(m).(sigID))
+                plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+            end
             
             % Add labels
             xlabel('Time from cue on (ms)')
@@ -205,15 +216,86 @@ for m = 1:length(Monkeys)
             % Make the plot look nice
             formatSVMPlot(gca, gcf)
         end
+    end
+    % More detailed labels if desired.
+    %         sgtitle(sprintf('%s', Monkeys(m).Name), 'Interpreter', 'none')
+
+    % Save the plots
+    pause(0.5)
+    saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%s', Monkeys(m).Name, sigID, ID)), 'epsc')
+end
+
+%% Plot "bars and stars" for a particular timepoint
+
+mkYLims = {[0.45 0.85], [0.45 0.65]};
+singleInterval = [175 275];
+
+% Prepare figure
+figure2('Position', [2200 1300 250 630])
+hold on
+    
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    
+    % Pre-allocate vectors for plotting
+    accMeans = zeros(length(rSessions), 1, length(rArrayLocs));
+    accSems = zeros(length(rSessions), 1, length(rArrayLocs));
         
-        % More detailed labels if desired.
-        %         sgtitle(sprintf('%s', Monkeys(m).Name), 'Interpreter', 'none')
+    % New subplot for each monkey
+    subplot(length(Monkeys), 1, m)
+    hold on
         
-        % Save the plots
-        pause(0.5)
-        saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%s', Monkeys(m).Name, sigID)), 'epsc')
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
+        
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            interval = singleInterval;
+
+            % Get field names
+            kflID = get_good_interval_name2(interval, loc, 'KFL');
+
+            % Get data
+            kfls = Data(m).Sessions(sessn).(kflID);
+            kfls = kfls(:); % reshape into 1 x numel
+            accMeans(i, 1, iLoc) = mean(1 - kfls);
+            accSems(i, 1, iLoc) = std(1 - kfls) / numel(kfls);
+        end
+        
+        
+        % Plot line for multiple sessions
+        % mlc() is a function to get the RGB vals for the default
+        % MATLAB colors.
+        errorbar(1:length(rSessions), accMeans(:,1,iLoc), accSems(:,1,iLoc), '-', 'LineWidth', 2, 'Color', mlc(iLoc))
+        
+        % Stats testing if only two sessions (pre and post)
+        sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
+        if numel(rSessions)==2 && ismember(interval(1), starts(Monkeys(m).(sigID)))
+            plot(1:length(rSessions), repelem(max(accMeans(:,1,iLoc))*1.02, 1, 2), 'k-')
+            scatter(1.5, max(accMeans(:,1,iLoc))*1.05, 'k*')
+        end
+        
+        
+        % Add labels
+        ylabel('SVM accuracy')
+%         xticklabels({Data(m).Sessions(rSessions).ShortName})
+%         xtickangle(45)
+        xticklabels({'Pre', 'Post'})
+        xticks(1:length(rSessions))
+        
+        xlim([0.5 0.5+length(rSessions)])
+        % Make graphs have the same y-axes within each monkey
+        ylim(mkYLims{m})
+
+        % Make the plot look nice
+        formatSVMPlot(gca, gcf)
     end
 end
+sgtitle(sprintf('%d to %d', interval(1), interval(2)))
+% Save the plots
+pause(0.5)
+saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%d_%s_%d_to_%d', sigID, ID, loc, interval(1), interval(2))), 'epsc')
+
 
 %% Functions
 function formatSVMPlot(ax, fig)
