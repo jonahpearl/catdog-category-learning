@@ -67,13 +67,13 @@ for m = 1
    end
     
     KDE(m).Name = KDE(m).Name;
-    sessions_to_plot = 9;
+    sessions_to_plot = 7;
     
     for i = 1:length(sessions_to_plot)
         sessn = sessions_to_plot(i);
         %         units_to_plot = 1:length(KDE(m).Sessions(sessn).UnitInfo);
 %         units_to_plot = find(ismember({KDE(m).Sessions(sessn).UnitInfo.Location}, {'anterior', 'middle', 'posterior'}));
-        units_to_plot = find(ismember({KDE(m).Sessions(sessn).UnitInfo.Location}, { 'middle'}));
+        units_to_plot = find(ismember({KDE(m).Sessions(sessn).UnitInfo.Location}, {'middle'}));
         for j = 1:length(units_to_plot)
             unit = units_to_plot(j);
             
@@ -100,8 +100,8 @@ end
 
 %% Look through those units
 m = 1;
-sessn = 9;
-units = [107 108 109 110 113 114]; 
+sessn = 7;
+units = [106 107 109 112 113 119]; 
 % Martha sessn 7: 2, 6, 24 (later), 58, 90 (later), 112
 % Martha sessn 9: 105, 114
 % Max sessn 6: 187, 300, 317, 
@@ -120,8 +120,13 @@ for j = 1:length(units)
 end
 
 %% Plot units for paper
-unitIDs = {[1,7,2], [1,7,6], [2,7,170], [1,9,105], [2,6,187], [1,7,90], [2 7 10]}; % [m,sessn,unit]
-figure
+
+% Lists of units in each array for examples. Roughly manually sorted by
+% spike rate.
+% unitIDs = {[1 7 24], [1,7,6], [2,7,170], [1,7,2]}; arr = 'posterior'; % posterior
+% unitIDs = {[2,6,187], [2 6 224], [1,9,105], [1 7 112]}; arr = 'middle'; % middle
+unitIDs = {[2 7 10], [1 9 78], [1 9 76], [1 7 80]}; arr = 'anterior'; % anterior [m,sessn,unit]
+figure2('Position', [400 400 400 600])
 for i = 1:length(unitIDs)
     subplot(length(unitIDs),1,i)
     hold on
@@ -134,6 +139,8 @@ for i = 1:length(unitIDs)
         xticks(0)
     end
 end
+saveas(gcf, sprintf('../exampleKDEs_%s', arr), 'epsc')
+
 %% Functions
 function plotCatDogKDEs(KDE, m, sessn, unit, bw, pct)
     UnitKDE = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues; 
@@ -155,14 +162,15 @@ function plotCatDogKDEs(KDE, m, sessn, unit, bw, pct)
     plot(kde_x_vals, f2, 'b-', 'LineWidth', 2)
     
     yl = ylim;
-    plot(kde_x_vals(t), yl(2)*1.02, 'ko','MarkerFaceColor', 'k', 'MarkerSize', 4)
-    ylim([yl(1) yl(2)*1.05])
+    plot(kde_x_vals(t), yl(2)*1.06, 'ko','MarkerFaceColor', 'k', 'MarkerSize', 4)
+    ylim([0 yl(2)*1.12])
     % xlabel('Time from cue on (ms)')
     % ylabel('Spikes / second / trial')
     xlim([-200 500])
-%     title(sprintf('%s, session %s, unit %d (%s)', KDE(m).Name(1:3), KDE(m).Sessions(sessn).ShortName, unit, KDE(m).Sessions(sessn).UnitInfo(unit).Location), 'Interpreter', 'none')
     shortName = regexp(KDE(m).Sessions(sessn).ShortName, '(Pre|Post)', 'match', 'once');
-    title(sprintf('%s, %s, %s', upper(KDE(m).Name(3)), shortName, KDE(m).Sessions(sessn).UnitInfo(unit).Location))
+%     title(sprintf('%s, session %s, unit %d (%s)', KDE(m).Name(1:3), KDE(m).Sessions(sessn).ShortName, unit, KDE(m).Sessions(sessn).UnitInfo(unit).Location), 'Interpreter', 'none')
+%     title(sprintf('%s, %s, %s', upper(KDE(m).Name(3)), shortName, KDE(m).Sessions(sessn).UnitInfo(unit).Location))
+%     title(sprintf('%s', KDE(m).Sessions(sessn).UnitInfo(unit).Location))
     set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
         'XMinorTick', 'off', 'YMinorTick', 'off',...
         'fontsize',18, ...
