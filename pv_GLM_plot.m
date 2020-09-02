@@ -42,7 +42,7 @@ end
 
 %% Find desired GLM data
 
-ID = 20752;
+ID = 633648; % 75-175, 175-275, 275-375
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -99,7 +99,10 @@ for m = 1:length(Monkeys)
     for iLoc = 1:length(rArrayLocs)
         loc = rArrayLocs{iLoc};
         
-        propSig = zeros(1, length(rSessions));
+        % Pre-allocate vectors (proportion = nSig/nTotal but collecting
+        % this way makes stats tests easier)
+        nSig = zeros(1, length(rSessions));
+        nTotal = zeros(1, length(rSessions));
         for i = 1:length(rSessions)
             sessn = rSessions(i);
             
@@ -117,20 +120,23 @@ for m = 1:length(Monkeys)
             
             % Get data
             pVals = Data(m).Sessions(sessn).GLM_Pvals;
-            propSig(i) = sum(pVals(units, idx) < glm_alpha) / sum(units);
+            nSig(i) = sum(pVals(units, idx) < glm_alpha);
+            nTotal(i) = sum(units);
         end
         
         % Plot the data
-        plot(1:length(rSessions), propSig)
+        plot(1:length(rSessions), nSig ./ nTotal, 'o-', 'MarkerFaceColor', mlc(1))
         
         % Stats testing if only two sessions (pre and post)
-        if numel(rSessions)==2 && 0
-            
+        if numel(rSessions)==2 && prop_test([nSig(1) nSig(2)], [nTotal(1) nTotal(2)], false, glm_alpha)
+            yval = max(nSig ./ nTotal);
+            plot(1:length(rSessions), repelem(yval*1.02, 1, 2), 'k-')
+            scatter(1.5, yval*1.05, 'k*')
         end
         
         
         % Add labels
-        ylabel('SVM accuracy')
+        ylabel('Fraction units with signf. diff.')
 %         xticklabels({Data(m).Sessions(rSessions).ShortName})
 %         xtickangle(45)
         xticklabels({'Pre', 'Post'})
@@ -147,7 +153,7 @@ end
 sgtitle(sprintf('%d to %d', interval(1), interval(2)))
 % Save the plots
 % pause(0.5)
-% saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%d_%s_%d_to_%d', sigID, ID, loc, interval(1), interval(2))), 'epsc')
+% saveas(gcf, fullfile(figureSavePath, sprintf('GLM_%g_%s_%d_to_%d', ID, loc, interval(1), interval(2))), 'epsc')
 
 %% Functions
 function formatSVMPlot(ax, fig)
