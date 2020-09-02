@@ -113,21 +113,11 @@ for m = 1:length(Monkeys)
             
             % Get interval to use
             rIntervals = Data(m).Sessions(sessn).GLM_intervals;
-            for iInt = 1:length(rIntervals)
-                if all(rIntervals{iInt} == singleInterval)
-                    int = iInt;
-                    break
-                else 
-                    int = -1;
-                end
-            end
-            if int == -1
-                error('Requested interval not found in interval list')
-            end
+            idx = find(cellfun(@(a) all(a == interval), rIntervals));
             
             % Get data
             pVals = Data(m).Sessions(sessn).GLM_Pvals;
-            propSig(i) = sum(pVals(units, int) < glm_alpha) / sum(units);
+            propSig(i) = sum(pVals(units, idx) < glm_alpha) / sum(units);
         end
         
         % Plot the data

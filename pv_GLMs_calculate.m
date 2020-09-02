@@ -84,7 +84,8 @@ for m = 1:length(Monkeys)
         Y = Monkeys(m).Sessions(sessn).Session_Y_catg; % list of categories for each image in X (1 or 2)
         
         % Manually reduce intervals tested
-        rIntervals = {[75 175], [175 275], [275 375]};
+        rIntervals_original = rIntervals; % for finding idx in 3rd dim of X_full
+        rIntervals = {[75 175], [175 275], [275 375]}; % for controlling loops
         
         % Pre-allocate the storage vector
         pVals = zeros(size(X_full,2), length(rIntervals));
@@ -106,8 +107,8 @@ for m = 1:length(Monkeys)
             % Run the GLM analysis
             for iInt = 1:length(rIntervals)
                 interval = rIntervals{iInt};
-                
-                t = table(X_full(:, iUnit, iInt), Y);
+                idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
+                t = table(X_full(:, iUnit, idx), Y);
                 glm = fitglm(t, 'Var1 ~ Y', 'Distribution', 'poisson');
                 pVals(iUnit, iInt) = glm.Coefficients{2,4}; % 2,4 is ind for pval of slope
                 
