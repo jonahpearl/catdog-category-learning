@@ -82,7 +82,7 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% (Prop VR) Use major-axis regression to assess slopes, store residuals
+%% Run major-axis regression to assess slopes, store residuals
 % MAR alpha is not dynamic for figures -- if you want to use a different
 % MAR alpha (for slope CI's), come back here and re-run the analysis first.
 
@@ -308,6 +308,106 @@ for m = 1:length(Monkeys)
         saveas(gcf, fullfile(figureSavePath, sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
     end
 end
+
+%% Plot slopes of selected MARs
+
+%% Fig 3: Compare slopes of MAR regressions across days
+vr_alpha = 0.05;
+alpha_string_scale_factor = 100;
+test_intervals = {[175 350]};
+area_to_plot = 'te';
+
+% make fig
+figure2('Position', [400 400 600 800]);
+hold on
+for m = 1:length(Monkeys)
+    subplot(2,1,m)
+    hold on
+    
+    sessions_to_use = Monkeys(m).Sessions_to_use;
+    baseline_i_vals = [];
+    
+    % get baseline/pre/post session inds
+    for i = 1:length(sessions_to_use)
+        sessn = sessions_to_use(i);
+        if ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post', 'once'))
+            post_i_val = i;
+        elseif ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre', 'once'))
+            pre_i_val = i;
+        elseif ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Base', 'once'))
+            baseline_i_vals = [baseline_i_vals i];
+        end
+    end
+    
+    for p = 1:length(test_intervals)
+        test_int = test_intervals{p};
+        slope_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
+%         slope_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d_OutliersRm', area_to_plot, vr_alpha*alpha_string_scale_factor));
+        
+        % pre allocate
+        theta_means = zeros(1,length(sessions_to_use));
+        theta_bounds = zeros(2,length(sessions_to_use));
+        
+        % collect data
+        for i = 1:length(sessions_to_use)
+            sessn = sessions_to_use(i);
+            t = Monkeys(m).Sessions(sessn).(slope_id);
+            theta_means(i) = t(2);
+            theta_bounds(:,i) = [t(1); t(3)];
+            if ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post', 'once'))
+                post_data = t;
+            end
+        end
+        
+        % plot data
+        errorbar(baseline_i_vals, theta_means(baseline_i_vals), diff(theta_bounds(:,baseline_i_vals))/2, 'LineWidth', 2, ...
+            'DisplayName', sprintf('%s, %d to %d', Monkeys(m).Name, test_int(1), test_int(2)),...
+            'Color', matlab_colors(1,:))
+        errorbar([pre_i_val post_i_val], theta_means([pre_i_val post_i_val]), diff(theta_bounds(:, [pre_i_val post_i_val]))/2, 'LineWidth', 2, ...
+            'DisplayName', sprintf('%s, %d to %d', Monkeys(m).Name, test_int(1), test_int(2)),...
+            'Color', matlab_colors(1,:))
+        
+        % stats testing
+        for i = 1:length(sessions_to_use)
+            sessn = sessions_to_use(i);
+            switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+                case {'Pre'}
+                    t = Monkeys(m).Sessions(sessn).(slope_id);
+                    test_bounds = t([1 3]);
+                    post_bounds = post_data([1 3]);
+                    % look for overlap in the confidence intervals.
+                    if isempty(intersect(round(test_bounds(1),1):0.1:round(test_bounds(2),1), round(post_bounds(1),1):0.1:round(post_bounds(2),1)))
+                        scatter(mean([pre_i_val post_i_val]), t(1)*1.075, '*k', 'HandleVisibility', 'off')
+                        plot([pre_i_val post_i_val], repelem(t(1)*1.05, 1, 2) , '-k', 'LineWidth', 2, 'HandleVisibility', 'off')
+                    end
+                case 'Post'
+                    % dont test against itself
+                    continue
+            end
+        end
+    end
+    
+    % format plot
+    xlabel('Session')
+    xticks(1:length(sessions_to_use))
+    xticklabs = Monkeys(m).XTickLabs;
+%     xticklabels(get_xtick_labs_colored(xticklabs, short_names, epoch_colors))
+%     xtickangle(45)
+    xticklabels(xticklabs)
+    xlim([0.5 0.5 + length(sessions_to_use)])
+    ylabel('Slope (degrees)')
+    ylim([40 51])
+    yticks(40:5:50)
+    set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+        'XMinorTick', 'off', 'YMinorTick', 'off', 'YGrid', 'on', ...
+        'fontsize', 26, ...
+        'fontname', 'Helvetica', 'fontweight', 'normal', ...
+        'XColor', 'black', 'YColor', 'black')
+    % legend({'Monkey R', 'Monkey X'}, 'Interpreter', 'none')
+    set(gcf, 'Color', 'w')
+end
+% sgtitle(sprintf('%s, slopes of major-axis regression, VR alpha %0.2f', area_to_plot, vr_alpha), 'Interpreter', 'none')
+
 
 %% Functions
 function formatPlot(ax, fig)
