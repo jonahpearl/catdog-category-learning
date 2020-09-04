@@ -10,7 +10,9 @@ CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 pv_path = 'XMA2/Monkey_structs';
 
 % Load spike data
-load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_ni.mat'))
+Data = load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_ni.mat'));
+[status, Monkeys] = stitch_monkeyStruct_from_parts(Data);
+clear Data
 
 %% Collect Session Y (image id and catg id)
 % very fast
@@ -67,7 +69,7 @@ for m = 1:length(Monkeys)
 
             
             % Pre-allocate spike times
-            X = zeros(length(catg1_timeson)+length(catg2_timeson, length(units_to_use));
+            X = zeros(length(catg1_timeson)+length(catg2_timeson), length(units_to_use));
 
             for j = 1:length(units_to_use)
 
@@ -107,14 +109,14 @@ for m = 1:length(Monkeys)
 
             end
             % Store
-            xid = get_good_interval_name2(interval_to_test, 'full', 'X');
-            Monkeys(m).Sessions(sessn).(xid) = X;
+            testID = get_good_interval_name2(interval_to_test, 'full', 'X');
+            Monkeys(m).Sessions(sessn).(testID) = X;
             
         end
     end
 end
 
-%% Get visual responsiveness
+%% Get overall visual responsiveness
 
 % test_intervals = {[75 175], [175 275], [275 375], [75 375]};
 % baseline_intervals = {[-150 -50], [-150 -50], [-150 -50], [-250 50]};
@@ -123,72 +125,86 @@ end
 test_intervals = {[175 275]};
 baseline_intervals = {[-150 -50]};
 
-by = 'image'; % all, category, or image. Run all and image when processing new data.
-switch by
-    case 'all'
-        groupings = []; % overall vis resp
-    case 'category'
-        groupings = [1 2]; % cat vs dog vis resp
-    case 'image'
-        groupings = 1:520; % vis resp for each image (count of this gives rough image-level selectivity)
+for m = 1:length(Monkeys)
+    for i = 1:length(Monkeys(m).Sessions)
+        for k = 1:length(test_intervals)
+            
+            % Find the requested spike count fields
+            test_int = test_intervals{k};
+            baseline_int= baseline_intervals{k};
+            testID = get_good_interval_name2(test_int, 'full', 'X');
+            baseID = get_good_interval_name2(baseline_int, 'full', 'X');
+            testSC = Monkeys(m).Sessions(i).(testID); % test int
+            baselineSC = Monkeys(m).Sessions(i).(baseID); % baseline int
+
+            % Field names for results
+            tid = get_good_interval_name2(test_int, 'full', 'VisResp_all_TTEST');
+            bid = get_good_interval_name2(baseline_int, '', '');
+            fullID = strcat(tid,bid);
+
+            % Test each unit
+            for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
+                [~, Monkeys(m).Sessions(i).UnitInfo(j).(fullID)] = ttest2(baselineSC(:,j), testSC(:,j), 'tail', 'left'); 
+                
+                % Old way with non-parametric testing
+%                 Monkeys(m).Sessions(i).UnitInfo(j).(contrast_id) = signrank(X2(:,j) - X1(:,j), 0, 'tail', 'left'); % tests that median(baseline-test) < 0
+            end
+        end
+    end
 end
+
+%% Get visual responsiveness to each image
+
+% test_intervals = {[75 175], [175 275], [275 375], [75 375]};
+% baseline_intervals = {[-150 -50], [-150 -50], [-150 -50], [-250 50]};
+% test_intervals = {[175 350], [75 175]};
+% baseline_intervals = {[-175 0], [-150 -50]};
+test_intervals = {[175 275]};
+baseline_intervals = {[-150 -50]};
+
+groupings = 1:520; % vis resp for each image (count of this gives rough image-level selectivity)
+
 
 for m = 1:length(Monkeys)
     for i = 1:length(Monkeys(m).Sessions)
         for k = 1:length(test_intervals)
             
+            % Find the requested spike count fields
             test_int = test_intervals{k};
             baseline_int= baseline_intervals{k};
-            xid = get_good_interval_name2(test_int, 'full', 'X');
-            yid = get_good_interval_name2(baseline_int, 'full', 'X');
+            testID = get_good_interval_name2(test_int, 'full', 'X');
+            baseID = get_good_interval_name2(baseline_int, 'full', 'X');
+            testSC = Monkeys(m).Sessions(i).(testID); % test int
+            baselineSC = Monkeys(m).Sessions(i).(baseID); % baseline int
             
-            % get data
-            X1 = Monkeys(m).Sessions(i).(xid); % test int
-            X2 = Monkeys(m).Sessions(i).(yid); % baseline int
-
-            switch by
-                case 'all'
-                    tid = get_good_interval_name2(test_int, 'full', 'VisResp_all_TTEST');
-                    bid = get_good_interval_name2(baseline_int, '', '');
-                    fullID = strcat(tid,bid);
-
-                    for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
-%                         Monkeys(m).Sessions(i).UnitInfo(j).(contrast_id) = signrank(X2(:,j) - X1(:,j), 0, 'tail', 'left'); % tests that median(baseline-test) < 0
-                        [~, Monkeys(m).Sessions(i).UnitInfo(j).(fullID)] = ttest2(X2(:,j), X1(:,j), 'tail', 'left'); 
-                    end
+            % Pre-allocate, (num imgs) x (num units)
+            img_vr_mat = zeros(length(groupings), length(Monkeys(m).Sessions(i).UnitInfo));
+            
+            % For each image...
+            for p = 1:length(groupings)
+                
+                % Get field name for results
+%                 tid = get_good_interval_name2(test_int, 'full', 'VisResp_test_img');
+                tid = get_good_interval_name2(test_int, 'full', 'VisResp_test_img_TTEST');
+                bid = get_good_interval_name2(baseline_int, '', '');
+                fullID = strcat(tid,bid);   
+                
+                % Find relevant trials (trials when that image was shown)
+                idx = find(Monkeys(m).Sessions(i).Session_Y_imageID == p);
+                
+                % Test each unit on those trials
+                for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
+                    [~,img_vr_mat(p,j)] = ttest2(baselineSC(idx,j), testSC(idx,j), 'tail', 'left'); 
                     
-%                 case 'category'
-%                     for p = 1:length(groupings)
-%                         tid = get_good_interval_name2(test_int, 'full', sprintf('VisResp_test_catg_%d',p));
-%                         bid = get_good_interval_name2(baseline_int, '', '');
-%                         fullID = strcat(tid,bid);
-%                         idx = find(Monkeys(m).Sessions(i).Session_Y_catg == p);
-% 
-%                         for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
-%                             Monkeys(m).Sessions(i).UnitInfo(j).(fullID) = ...
-%                                 signrank(reshape(X2(idx,j),1,numel(X2(idx,j))) - reshape(X1(idx,j),1,numel(X1(idx,j))),...
-%                                 0, 'tail', 'left'); % tests that median(baseline-test) < 0
-%                         end
-%                     end
-                    
-                case 'image'
-                    % matrix of (num imgs) x (num units)
-                    img_vr_mat = zeros(length(groupings), length(Monkeys(m).Sessions(i).UnitInfo));
-                    for p = 1:length(groupings)
-%                         tid = get_good_interval_name2(test_int, 'full', 'VisResp_test_img');
-                        tid = get_good_interval_name2(test_int, 'full', 'VisResp_test_img_TTEST');
-                        bid = get_good_interval_name2(baseline_int, '', '');
-                        fullID = strcat(tid,bid);    
-                        idx = find(Monkeys(m).Sessions(i).Session_Y_imageID == p);
-                        for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
-                            [~,img_vr_mat(p,j)] = ttest2(X2(idx,j), X1(idx,j), 'tail', 'left'); 
-%                             img_vr_mat(p,j) = signrank(X2(idx,j), X1(idx,j), 'tail', 'left'); % tests that median(baseline-test) < 0
-%                             signrank(reshape(X2(idx,j),1,numel(X2(idx,j))) - reshape(X1(idx,j),1,numel(X1(idx,j))),...
-%                                 0, 'tail', 'left')
-                        end
-                    end
-                Monkeys(m).Sessions(i).(fullID) = img_vr_mat;
+                    % Old way of non-parametric testing
+%                     img_vr_mat(p,j) = signrank(baselineSC(idx,j), testSC(idx,j), 'tail', 'left'); % tests that median(baseline-test) < 0
+%                     signrank(reshape(baselineSC(idx,j),1,numel(baselineSC(idx,j))) - reshape(testSC(idx,j),1,numel(testSC(idx,j))),...
+%                         0, 'tail', 'left')
+                end
             end
+            
+            % Store results
+            Monkeys(m).Sessions(i).(fullID) = img_vr_mat;
         end
     end
 end
