@@ -67,7 +67,6 @@ for m = 1:length(Monkeys)
     end
 end
 
-
 %% Run GLMs
 
 for m = 1:length(Monkeys)
