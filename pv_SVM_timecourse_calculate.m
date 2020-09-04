@@ -37,11 +37,12 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 
 % SVM Parameters
 random_seed = 10; % for reproducibility 
-% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
-rArrayLocs = {'te'};
-rSessionsByMonk = {[7 9], [6 7]};
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
+% rArrayLocs = {'te'};
+% rSessionsByMonk = {[7 9], [6 7]};
+rSessionsByMonk = {1:9, 1:7};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
-runShuffle = true; % run the shuffled condition?
+runShuffle = false; % run the shuffled condition?
     nShuffles = 100;
 matchInputSizes = false; % make input matrices all same size (control) ?
     % These parameters only used if matching input sizes. If false, these
@@ -49,13 +50,15 @@ matchInputSizes = false; % make input matrices all same size (control) ?
     proportion_of_min_pop_size = 0.75; 
     proportion_of_min_trials = 0.75;
     nRandomSubsamples = 20;
+manuallyReduceIntervals = true; % test a subset of all the intervals for faster testing
+    manualIntervals = {[75 175] [175 275] [275 375]};
 kfold_num = 5; % k-fold cross validation. 
 % Note that folds are not generated purely randomly -- we impose
 % constraints about not re-using the same image in train vs test ("abstract
 % category") and about balancing the number of cats and dogs in each fold
 % (so that the shuffle comes out right at 50 %).
 
-% Interval parameters
+% Interval parameters (for loading the correct spike counts file)
 step = 5;
 width = 100;
 
@@ -73,11 +76,21 @@ if ~matchInputSizes
     nRandomSubsamples = 1;
 end
 
-paramStruct = struct('RandomSeed', random_seed, 'RArrayLocs', {rArrayLocs}, ...
-    'IgnoreVal', ignoreVal, 'RunShuffle', runShuffle, 'KFoldNum', kfold_num, ...
+if ~manuallyReduceIntervals
+    ints_used = -1;
+else
+    ints_used = manualIntervals;
+end
+
+paramStruct = struct('RandomSeed', random_seed,...
+    'RArrayLocs', {rArrayLocs}, ...
+    'IgnoreVal', ignoreVal,...
+    'RunShuffle', runShuffle,...
+    'KFoldNum', kfold_num, ...
     'MatchInputBool', matchInputSizes,...
     'MatchInputParams', [proportion_of_min_pop_size, proportion_of_min_trials, nRandomSubsamples],...
-    'SessionsUsed', {rSessionsByMonk});
+    'SessionsUsed', {rSessionsByMonk},...
+    'IntervalsUsed', {ints_used});
 
 %% Collect Session Y (image id and catg id)
 % very fast
@@ -135,7 +148,6 @@ for m = 1:length(Monkeys)
     end
 end
 
-
 %% Run SVMs
 
 for m = 1:length(Monkeys)
@@ -161,11 +173,24 @@ for m = 1:length(Monkeys)
         Y = Monkeys(m).Sessions(sessn).Session_Y_catg; % list of categories for each image in X (1 or 2)
         unitBools = Monkeys(m).Sessions(sessn).SVMBools; % cell array of boolean for units to use for each loc
         
+        % For finding intervals in X_full
+        rIntervals_original = rIntervals;
+        
+        % Update intervals if requested
+        if manuallyReduceIntervals
+            rIntervals = manualIntervals;
+        end
+        
+        
         for iLoc = 1:length(rArrayLocs)
             loc = rArrayLocs{iLoc};
+            
+            % Get boolean for UnitInfo of units in this location
             locBools = unitBools{iLoc};
+            
+            % Get minimum-adjusted number of units across sessions for this array location.
             if matchInputSizes
-                numUnits = numUnitsVec(iLoc); % correct minimum-adjusted number of units across sessions for this array location.
+                numUnits = numUnitsVec(iLoc); 
             end
             
             % Catch subsets with no data
@@ -174,12 +199,14 @@ for m = 1:length(Monkeys)
                 % do other stuff, store nans
             end
             
-            % Take the correct units.
+            % Take the correct units (not subsetted yet)
             X = X_full(:, locBools, :);
-            
             
             for iInt = 1:length(rIntervals)
                 interval = rIntervals{iInt};
+                
+                % Find index in X's 3rd dim for requested interval
+                idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
                 
                 % Pre-allocate the storage vector for the SVMs.
                 kflValues = zeros(nRandomSubsamples*kfold_num,1);
@@ -197,11 +224,11 @@ for m = 1:length(Monkeys)
                     if matchInputSizes
                         trial_idx = randsample(size(X,1), numTrials);
                         unit_idx = randsample(size(X,2), numUnits);
-                        X_subset = X(trial_idx, unit_idx, iInt); % data for only those trials and a random loc of neurons
+                        X_subset = X(trial_idx, unit_idx, idx); % data for only those trials and a random loc of neurons
                         Y_subset = Y(trial_idx); % ground truth category for those trials
                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID(trial_idx); % image IDs for those trials
                     else
-                        X_subset = X(:,:, iInt);
+                        X_subset = X(:,:, idx);
                         Y_subset = Y;
                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID;
                     end
@@ -270,6 +297,9 @@ end
 for m = 1:length(Monkeys)
     Monkeys(m).Sessions = rmfield(Monkeys(m).Sessions, {'UnitInfo', 'CueInfo', 'TrialInfo', 'TimesBT', 'CodesBT', 'Fixn_err_TC'});
 end
+
+% Store intervals used
+Monkeys(m).RIntervals = rIntervals;
 
 % Save the data and add a row to the Record
 fullSVMPath = fullfile(EXT_HD, pv_path, 'SVM_results_%g.mat');

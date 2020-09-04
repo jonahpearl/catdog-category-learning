@@ -29,8 +29,9 @@ cluster_alpha = 0.05;
 % ID = 570049; % te and the three individual arrays, matching at 75%, with shuffle.
 % ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
 % ID = 439280; % te, no matching, with 5x shuffle.
-ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
+% ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
 % ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
+ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -68,14 +69,15 @@ end
 %% Choose what to plot
 
 % Choose sessions.
-rSessionsByMonk = {[7 9] [6 7]};
+% rSessionsByMonk = {[7 9] [6 7]};
+rSessionsByMonk = {[1 2 3 5 6 7 8 9], 1:7};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-rArrayLocs = {'te'};
+% rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-% rArrayLocs = {'anterior', 'middle', 'posterior'}; 
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
 
 % This section of code automatically looks at shuffled data -- do not 
@@ -154,14 +156,14 @@ for m = 1:length(Monkeys)
     accSems = zeros(length(rSessions), length(rIntervals), length(rArrayLocs));
     
     % Prepare figure
-    figure2
+    figure2('Position', [400 400 1000 600])
     hold on
     
     for iLoc = 1:length(rArrayLocs)
         loc = rArrayLocs{iLoc};
         
         % New subplot for each array location
-%         subplot(2, ceil(length(rArrayLocs)/2), iLoc)
+        subplot(2, ceil(length(rArrayLocs)/2), iLoc)
         hold on
         
         for i = 1:length(rSessions)
@@ -195,13 +197,19 @@ for m = 1:length(Monkeys)
             
             % Plot signf inds
             sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
-            if ~ isempty(Monkeys(m).(sigID))
-                plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+            try 
+                if ~ isempty(Monkeys(m).(sigID))
+                    plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+                end
+            catch
+                warning('No field found for cluster permutation statistics')
             end
             
             % Add labels
-            xlabel('Time from cue on (ms)')
-            ylabel('SVM accuracy')
+            if iLoc == 1
+                xlabel('Time from cue on (ms)')
+                ylabel('SVM accuracy')
+            end
             
             % Make graphs have the same y-axes within each monkey
             ylim(mkYLims{m})
@@ -210,7 +218,7 @@ for m = 1:length(Monkeys)
             
             % Detailed labels if desired
             %             ylabel('SVM abcat accuracy (mean +/- SEM)')
-            %             title(sprintf('%s', loc), 'Interpreter', 'none')
+            title(sprintf('%s', loc), 'Interpreter', 'none')
             %             legend()
             
             % Make the plot look nice
@@ -221,14 +229,14 @@ for m = 1:length(Monkeys)
     %         sgtitle(sprintf('%s', Monkeys(m).Name), 'Interpreter', 'none')
 
     % Save the plots
-    pause(0.5)
-    saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%s', Monkeys(m).Name, sigID, ID)), 'epsc')
+%     pause(0.5)
+%     saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%g', Monkeys(m).Name, sigID, ID)), 'epsc')
 end
 
 %% Plot "bars and stars" for a particular timepoint
 
 mkYLims = {[0.45 0.85], [0.45 0.65]};
-singleInterval = [175 275];
+singleInterval = [275 375];
 
 % Prepare figure
 figure2('Position', [2200 1300 250 630])
@@ -266,7 +274,11 @@ for m = 1:length(Monkeys)
         % Plot line for multiple sessions
         % mlc() is a function to get the RGB vals for the default
         % MATLAB colors.
-        errorbar(1:length(rSessions), accMeans(:,1,iLoc), accSems(:,1,iLoc), '-', 'LineWidth', 2, 'Color', mlc(iLoc))
+        errorbar(1:length(rSessions), accMeans(:,1,iLoc), accSems(:,1,iLoc),...
+            '-',...
+            'LineWidth', 2,...
+            'Color', mlc(iLoc),...
+            'DisplayName', loc)
         
         % Stats testing if only two sessions (pre and post)
         sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
@@ -278,12 +290,13 @@ for m = 1:length(Monkeys)
         
         % Add labels
         ylabel('SVM accuracy')
-%         xticklabels({Data(m).Sessions(rSessions).ShortName})
-%         xtickangle(45)
-        xticklabels({'Pre', 'Post'})
+        xticklabels({Data(m).Sessions(rSessions).ShortName})
+        xtickangle(45)
+%         xticklabels({'Pre', 'Post'})
         xticks(1:length(rSessions))
-        
         xlim([0.5 0.5+length(rSessions)])
+        legend
+        
         % Make graphs have the same y-axes within each monkey
         ylim(mkYLims{m})
 
