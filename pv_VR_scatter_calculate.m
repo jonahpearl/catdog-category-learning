@@ -211,4 +211,14 @@ end
 
 %% Save data
 fname = 'MaxMarta_VR_img_TTest_v2.mat'; % v2 has 175-275
-save(fullfile(EXT_HD, pv_path, fname), 'Monkeys')
+t = whos('Monkeys');
+if t.bytes > 2e9 % split large struct and save all the vars
+    [status, vnames] = split_monkeyStruct_in_parts(Monkeys);
+    save(fullfile(EXT_HD, pv_path, fname), vnames{:})
+else
+    save(fullfile(EXT_HD, pv_path, fname), 'Monkeys')
+end
+
+
+
+

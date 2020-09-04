@@ -9,7 +9,7 @@ EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
 CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 pv_path = 'XMA2/Monkey_structs';
 figureSavePath = '/Users/jonahpearl/Documents/BJR group/Catdog paper/';
-fname = 'MaxMarta_VR_img_TTest.mat';
+fname = 'MaxMarta_VR_img_TTest_v2.mat';
 Data = load(fullfile(EXT_HD, pv_path, fname));
 [status, Monkeys] = stitch_monkeyStruct_from_parts(Data);
 clear Data
@@ -89,10 +89,12 @@ end
 vr_alpha = 0.05;
 mar_alpha = 0.05;
 alpha_string_scale_factor = 100;
-test_intervals = {[75 175], [175 350]};
-baseline_intervals = {[-150 -50], [-175 0]};
+% test_intervals = {[75 175], [175 350]};
+% baseline_intervals = {[-150 -50], [-175 0]};
 % test_intervals = {[175 350]};
 % baseline_intervals = {[-175 0]};
+test_intervals = {[175 275]};
+baseline_intervals = {[-150 -50]};
 make_plots = false;
 
 
@@ -177,7 +179,8 @@ end
 
 %% Plot selected MAR results with scatterplots
 
-interval_to_plot = [175 350];
+% interval_to_plot = [175 350];
+interval_to_plot = [175 275];
 vr_alpha = 0.05;
 alpha_string_scale_factor = 100;
 area_to_plot = 'te';
@@ -311,10 +314,10 @@ end
 
 %% Plot slopes of selected MARs
 
-%% Fig 3: Compare slopes of MAR regressions across days
 vr_alpha = 0.05;
 alpha_string_scale_factor = 100;
-test_intervals = {[175 350]};
+% test_intervals = {[175 350]};
+test_intervals = {[175 275]};
 area_to_plot = 'te';
 
 % make fig
