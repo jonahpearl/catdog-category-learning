@@ -327,12 +327,10 @@ colors = cbrewer('qual', 'Dark2', 3);
 colors = colors([3 2 1], :);
 range_normalize = false;
 
-
 % Pre allocate
 pre_data = cell(length(KDE), length(areas_to_plot));
 post_data = cell(length(KDE), length(areas_to_plot));
 chi_sq_inds = 200:50:700; % inds in kde_x_vals to test...corresponds to -200:50:500 in real time.
-
 
 
 for m = 1:length(KDE)
@@ -416,8 +414,13 @@ for m = 1:length(KDE)
                 heatmap_mean = normalize(heatmap_mean, 'range');
             end
             
+            % Set xvals to use
+            xvals = 1:length(heatmap_mean);
+            
+            
             % Plot the data
-            plot(heatmap_mean,  'LineWidth', 1.5, ...
+            plot(xvals, heatmap_mean, ...
+                'LineWidth', 1.5, ...
                 'DisplayName', KDE(m).Sessions(sessn).ShortName,...
                 'Color', colors(col_ind, :))
             
@@ -449,6 +452,159 @@ for m = 1:length(KDE)
                 scatter(ii, yl(2)*0.97, 'ko', 'filled')
             end
         end
+
+        % Format the plot some more
+        if a == 1
+            ylabel('Proportion signf. units')
+            xlabel('Time from cue on')
+        end
+        set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+            'XMinorTick', 'off', 'YMinorTick', 'off',...
+            'fontsize',26, ...
+            'fontname', 'Helvetica', ...
+            'XColor', 'black', 'YColor', 'black')
+        
+    end
+    % Format the plot some more
+%     sgtitle(sprintf('Monkey %s', KDE(m).Code))
+end
+
+%% Plot CDFs of avg timecourses (cat/dog diff) with days overlaid (learning)
+
+% Params
+areas_to_plot = {'anterior', 'middle', 'posterior'};
+% areas_to_plot = {'te'};
+boundary = 'static'; % static or dynamic
+% Not convinced correction is needed in this case.
+% chi_sq_base_alpha = 0.05;
+% chi_sq_alpha = chi_sq_base_alpha / numel(chi_sq_inds);
+chi_sq_alpha = 0.05;
+colors = cbrewer('qual', 'Dark2', 3);
+colors = colors([3 2 1], :);
+range_normalize = false;
+
+% Pre allocate
+pre_data = cell(length(KDE), length(areas_to_plot));
+post_data = cell(length(KDE), length(areas_to_plot));
+chi_sq_inds = 200:50:700; % inds in kde_x_vals to test...corresponds to -200:50:500 in real time.
+
+
+for m = 1:length(KDE)
+    
+    % Get sessions to use
+    sessions_to_plot = KDE(m).Sessions_to_use;
+%     if strcmp(KDE(m).Name, 'Marta_fix_cat_xma2')
+%         sessions_to_plot = [7 9];
+%     elseif strcmp(KDE(m).Name, 'Max_fix_cat_xma2')
+%         sessions_to_plot = [6 7];
+%     end
+    
+    
+    % Set up figure
+    figure2('Position', [200 200 1200 330]) % for arrays
+%     figure2('Position', [400 400 500 300]) % just te
+    hold on
+    
+    for a = 1:length(areas_to_plot)
+        area = areas_to_plot{a};
+        
+                % Plot all in one figure2:
+%                 switch area
+%                     case 'te'
+%                         subplot(2,3,1:3)
+%                     otherwise
+%                         subplot(2,3,2+a)
+%                 end
+%                 hold on
+                
+
+                %TE alone: don't do any subplots
+                
+                % Just arrays
+                subplot(1, 3, a)
+                hold on
+        
+        % Get data and plot
+        for i = 1:length(sessions_to_plot)
+            sessn = sessions_to_plot(i);
+            
+            % Choose correct units
+            switch area
+                case 'te'
+                    units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Area}, area));
+                otherwise
+                    units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Location}, area));
+            end
+            
+            % Choose color to plot with
+            if ~isempty(regexp(KDE(m).Sessions(sessn).ShortName, 'Base', 'once'))
+                col_ind = 1;
+            elseif ~isempty(regexp(KDE(m).Sessions(sessn).ShortName, 'Pre', 'once'))
+                col_ind = 2;
+            elseif ~isempty(regexp(KDE(m).Sessions(sessn).ShortName, 'Post', 'once'))
+                col_ind = 3;
+            end
+            
+            % Get real x-axis values
+            kde_x_vals = KDE(m).Sessions(sessn).UnitInfo(1).CueOnAllCues.KDEXVals;
+            
+            % Collect data
+            heatmap_mat = zeros(length(units_to_plot), length(kde_x_vals));
+            for j = 1:length(units_to_plot)
+                unit = units_to_plot(j);
+                switch boundary
+                    case 'static'
+                        exceedid = 'ExceedBD_FixedBound';
+                        heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
+                    case 'dynamic'
+                        exceedid = 'ExceedBD_DynamicBound';
+                        heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
+                    otherwise
+                        error('Unexpected value for boundary')
+                end
+            end
+            
+            % Calculate mean
+            heatmap_mean = mean(heatmap_mat); % 1 x num xvals
+            
+            % Set xvals to use
+            xvals = 1:length(heatmap_mean);
+            
+            % Convert to CDFs
+            data = zeros(1, length(heatmap_mean));
+            for iX = 1:length(data)
+                data(iX) = trapz(heatmap_mean(1:iX));
+            end
+            
+            if range_normalize
+                data = normalize(data, 'range');
+            end
+            
+            % Plot the data
+            plot(xvals, data, ...
+                'LineWidth', 1.5, ...
+                'DisplayName', KDE(m).Sessions(sessn).ShortName,...
+                'Color', colors(col_ind, :))
+            
+            % Format plot
+%             title(sprintf('Monkey %s, %s', KDE(m).Code, area), 'Interpreter', 'none')
+            title(sprintf('%s', area), 'Interpreter', 'none')
+            xticks(0:200:600)
+            xticklabels(kde_x_vals(1:200:end))
+            if strcmp(area, 'te')
+                xlabel('Time from cue on')
+                ylabel('Fraction units')
+            end
+            
+            % Store pre / post data for stats testing
+            if ~isempty(regexp(KDE(m).Sessions(sessn).ShortName, 'Post', 'once'))
+                post_data{m,a} = heatmap_mat;
+            elseif ~isempty(regexp(KDE(m).Sessions(sessn).ShortName, 'Pre', 'once'))
+                pre_data{m,a} = heatmap_mat;
+            end
+        end
+        
+        % Do stats testing
         
         % Format the plot some more
         if a == 1
