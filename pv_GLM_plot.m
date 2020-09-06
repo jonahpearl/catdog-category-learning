@@ -80,7 +80,7 @@ rArrayLocs = {'te'};
 
 %% Plot "bars and stars" for a particular timepoint
 
-mkYLims = {[0.45 0.85], [0.45 0.65]};
+allYLims = [0.3 0.6];
 singleInterval = [175 275];
 interval = singleInterval;
 glm_alpha = 0.05;
@@ -136,7 +136,7 @@ for m = 1:length(Monkeys)
         
         
         % Add labels
-        ylabel('Fraction units with signf. diff.')
+        ylabel({'Fraction units', 'with signf. diff.'})
 %         xticklabels({Data(m).Sessions(rSessions).ShortName})
 %         xtickangle(45)
         xticklabels({'Pre', 'Post'})
@@ -145,18 +145,19 @@ for m = 1:length(Monkeys)
         xlim([0.5 0.5+length(rSessions)])
         % Make graphs have the same y-axes within each monkey
 %         ylim(mkYLims{m})
+        ylim(allYLims)
 
         % Make the plot look nice
-        formatSVMPlot(gca, gcf)
+        formatGLMPlot(gca, gcf)
     end
 end
-sgtitle(sprintf('%d to %d', interval(1), interval(2)))
+% sgtitle(sprintf('%d to %d', interval(1), interval(2)))
 % Save the plots
 % pause(0.5)
-% saveas(gcf, fullfile(figureSavePath, sprintf('GLM_%g_%s_%d_to_%d', ID, loc, interval(1), interval(2))), 'epsc')
+saveas(gcf, fullfile(figureSavePath, sprintf('GLM_%g_%s_%d_to_%d', ID, loc, interval(1), interval(2))), 'epsc')
 
 %% Functions
-function formatSVMPlot(ax, fig)
+function formatGLMPlot(ax, fig)
 set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
     'XMinorTick', 'off', 'YMinorTick', 'off',...
     'fontsize',28, 'YGrid', 'on',...
@@ -165,69 +166,3 @@ set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
 set(fig, 'Color', 'white')
 end
 
-function tStats = getrealtstats(Data, m, rSessions, loc, rIntervals)
-    tStats = zeros(1, length(rIntervals));
-    for iInt = 1:length(rIntervals)
-        interval = rIntervals{iInt};
-
-        % Get field names
-        kflID = get_good_interval_name2(interval, loc, 'KFL');
-
-        % Run t-tests
-        s1 = Data(m).Sessions(rSessions(1)).(kflID);
-        s2 = Data(m).Sessions(rSessions(2)).(kflID);
-        [~,~,~,stats] = ttest2(s1, s2, 'Tail', 'both');
-        tStats(iInt) = stats.tstat;
-    end
-end
-
-function tStats_SHUFFLED = getshuffledtstats(Data, m, rSessions, loc, rIntervals)
-
-    % First calculate number of shuffles
-    kflID = get_good_interval_name2(rIntervals{1}, loc, 'KFL_SHUFFLE');
-    exampleKFLs = Data(m).Sessions(rSessions(1)).(kflID);
-    nShuffles = size(exampleKFLs,2);
-    
-    tStats_SHUFFLED = zeros(nShuffles, length(rIntervals));
-    for iInt = 1:length(rIntervals)
-        interval = rIntervals{iInt};
-        
-        % Get field names
-        kflID = get_good_interval_name2(interval, loc, 'KFL_SHUFFLE');
-
-        % Get data
-        s1 = Data(m).Sessions(rSessions(1)).(kflID);
-        s2 = Data(m).Sessions(rSessions(2)).(kflID);
-        
-        for iShuff = 1:nShuffles
-            [~,~,~,stats] = ttest2(s1(:,iShuff), s2(:, iShuff), 'Tail', 'both');
-            tStats_SHUFFLED(iShuff, iInt) = stats.tstat;
-        end
-    end
-end
-
-function clusterStats = calcShuffClusterStats(tStats, nClust)
-    
-    % Run the same algorithm as the real data
-    clusterStats = calculateTClusterStats(tStats);
-    
-    % make same length as real data
-    if length(clusterStats) < nClust
-        clusterStats(length(clusterStats):nClust) = 0;
-    elseif length(clusterStats) > nClust
-        clusterStats(nClust+1:end) = []; % sort is descending, so this removes smallest values
-    end
-end
-
-function [clusterStats, intsInCluster] = calculateTClusterStats(tStats)
-    starts = [1 find(diff(sign(tStats)))+1];
-    ends = [starts(2:end)-1 length(tStats)];
-    clusters = cell(1, length(starts));
-    intsInCluster = cell(1, length(starts)); % inds in rIntervals that belong to each cluster, for plotting later
-    for iClust = 1:length(clusters)
-        clusters{iClust} = tStats(starts(iClust):ends(iClust));
-        intsInCluster{iClust} = starts(iClust):ends(iClust);
-    end
-    [clusterStats, idx] = sort(abs(cellfun(@sum, clusters)), 'descend');
-    intsInCluster = intsInCluster(idx); % sort these to correspond to sorted cluster list
-end

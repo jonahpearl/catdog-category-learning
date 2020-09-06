@@ -29,9 +29,9 @@ cluster_alpha = 0.05;
 % ID = 570049; % te and the three individual arrays, matching at 75%, with shuffle.
 % ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
 % ID = 439280; % te, no matching, with 5x shuffle.
-% ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
+ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
 % ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
-ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
+% ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -69,15 +69,15 @@ end
 %% Choose what to plot
 
 % Choose sessions.
-% rSessionsByMonk = {[7 9] [6 7]};
-rSessionsByMonk = {[1 2 3 5 6 7 8 9], 1:7};
+rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
+% rSessionsByMonk = {[1 2 3 5 6 7 8 9], 1:7};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-% rArrayLocs = {'te'};
+rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
      
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
 
@@ -236,7 +236,8 @@ end
 
 %% Plot "bars and stars" for a particular timepoint
 
-mkYLims = {[0.45 0.85], [0.45 0.65]};
+% mkYLims = {[0.45 0.85], [0.45 0.65]};
+allYlims = [0.48 0.82];
 % singleInterval = [275 375];
 singleInterval = [175 275];
 
@@ -292,21 +293,22 @@ for m = 1:length(Monkeys)
         
         % Add labels
         ylabel('SVM accuracy')
-        xticklabels({Data(m).Sessions(rSessions).ShortName})
-        xtickangle(45)
-%         xticklabels({'Pre', 'Post'})
+%         xticklabels({Data(m).Sessions(rSessions).ShortName})
+%         xtickangle(45)
+        xticklabels({'Pre', 'Post'})
         xticks(1:length(rSessions))
         xlim([0.5 0.5+length(rSessions)])
-        legend
+%         legend
         
         % Make graphs have the same y-axes within each monkey
-        ylim(mkYLims{m})
+%         ylim(mkYLims{m})
+        ylim(allYlims)
 
         % Make the plot look nice
         formatSVMPlot(gca, gcf)
     end
 end
-sgtitle(sprintf('%d to %d', interval(1), interval(2)))
+% sgtitle(sprintf('%d to %d', interval(1), interval(2)))
 % Save the plots
 pause(0.5)
 saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%d_%s_%d_to_%d', sigID, ID, loc, interval(1), interval(2))), 'epsc')
