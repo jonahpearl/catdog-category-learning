@@ -78,6 +78,7 @@ rSessionsByMonk = {[1 2 3 5 6 7 8 9], 1:7};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
 rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+     
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
 
 % This section of code automatically looks at shuffled data -- do not 
@@ -236,7 +237,8 @@ end
 %% Plot "bars and stars" for a particular timepoint
 
 mkYLims = {[0.45 0.85], [0.45 0.65]};
-singleInterval = [275 375];
+% singleInterval = [275 375];
+singleInterval = [175 275];
 
 % Prepare figure
 figure2('Position', [2200 1300 250 630])
@@ -308,7 +310,6 @@ sgtitle(sprintf('%d to %d', interval(1), interval(2)))
 % Save the plots
 pause(0.5)
 saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%d_%s_%d_to_%d', sigID, ID, loc, interval(1), interval(2))), 'epsc')
-
 
 %% Functions
 function formatSVMPlot(ax, fig)
