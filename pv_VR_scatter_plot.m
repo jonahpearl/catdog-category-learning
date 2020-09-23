@@ -188,7 +188,7 @@ color_by_waveform_class = false;
 colors = cbrewer('qual', 'Set1', 5);
 f1 = figure('Position', [400 400 860 800]);
 hold on
-f2 = figure('Position', [400 400 860 800]);
+f2 = figure('Position', [400 400 400 800]);
 % figure('Position', [400 400 1600 500])
 hold on
 
@@ -209,7 +209,7 @@ for m = 1:length(Monkeys)
         slope = tan(deg2rad(Monkeys(m).Sessions(sessn).(slope_id)(2)));
         intercept = Monkeys(m).Sessions(sessn).(intercept_id)(2);
         xvals = 0:0.01:1;
-        diffs{i} = cat_props - dog_props;
+        diffs{i} = dog_props - cat_props;
         
         % ID session name and set some params accordingly.
         switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
@@ -244,6 +244,7 @@ for m = 1:length(Monkeys)
 %         title(sprintf('%s', Monkeys(m).Sessions(sessn).ShortName), 'FontWeight', 'normal')
         title(Monkeys(m).XTickLabs{i},'FontWeight', 'normal')
         formatPlot(gca, f1)
+        axis square
         
         % Color in example points
 %         if i == 1 && m == 1
@@ -258,8 +259,10 @@ for m = 1:length(Monkeys)
         
         % Make histograms to add to diag of scatters
         set(0, 'CurrentFigure', f2)
-        subplot(length(Monkeys),length(sessions_to_use),...
-            length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
+%         subplot(length(Monkeys),length(sessions_to_use),...
+%             length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
+        subplot(length(Monkeys), 1, m)
+        hold on
         histogram(dog_props - cat_props, 'BinEdges', -0.2:0.025:0.2)
         ax = gca;
         formatPlot(ax, f2)
@@ -267,8 +270,6 @@ for m = 1:length(Monkeys)
         ax.YGrid = 'off';
         ax.XGrid = 'off';
         ax.XLabel.FontSize = 40;
-        
-        
     end
     
 %     % Informative sgtitle if desired
@@ -279,11 +280,10 @@ for m = 1:length(Monkeys)
     [h,pval] = vartest2(diffs{pre_diff_idx}, diffs{post_diff_idx});
     fprintf('Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
             var(diffs{pre_diff_idx}), var(diffs{post_diff_idx}), h, pval)
-    
 end
 
 % saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
-% saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
+saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
 
 %% Draw each histogram separately
 
@@ -321,7 +321,7 @@ test_intervals = {[175 275]};
 area_to_plot = 'te';
 
 % make fig
-figure2('Position', [400 400 600 800]);
+figure2('Position', [400 400 300 800]);
 hold on
 for m = 1:length(Monkeys)
     subplot(2,1,m)
@@ -399,7 +399,7 @@ for m = 1:length(Monkeys)
     xticklabels(xticklabs)
     xlim([0.5 0.5 + length(sessions_to_use)])
     ylabel('Slope (degrees)')
-    ylim([40 51])
+    ylim([39 51])
     yticks(40:5:50)
     set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
         'XMinorTick', 'off', 'YMinorTick', 'off', 'YGrid', 'on', ...
@@ -410,7 +410,7 @@ for m = 1:length(Monkeys)
     set(gcf, 'Color', 'w')
 end
 % sgtitle(sprintf('%s, slopes of major-axis regression, VR alpha %0.2f', area_to_plot, vr_alpha), 'Interpreter', 'none')
-
+saveas(gcf, fullfile(figureSavePath, sprintf('VR_slopes_%s', m, sessn, slope_id)), 'epsc')
 
 %% Functions
 function formatPlot(ax, fig)
