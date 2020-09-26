@@ -283,7 +283,7 @@ for m = 1:length(Monkeys)
 end
 
 % saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
-saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
+% saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
 
 %% Draw each histogram separately
 
@@ -308,7 +308,7 @@ for m = 1:length(Monkeys)
         ax.YAxis.Visible = 'off';
         ax.YGrid = 'off';
         ax.XGrid = 'off';
-        saveas(gcf, fullfile(figureSavePath, sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
+%         saveas(gcf, fullfile(figureSavePath, sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
     end
 end
 
@@ -399,7 +399,7 @@ for m = 1:length(Monkeys)
     xticklabels(xticklabs)
     xlim([0.5 0.5 + length(sessions_to_use)])
     ylabel('Slope (degrees)')
-    ylim([39 51])
+    ylim([39 52])
     yticks(40:5:50)
     set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
         'XMinorTick', 'off', 'YMinorTick', 'off', 'YGrid', 'on', ...
