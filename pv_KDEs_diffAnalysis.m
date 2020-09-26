@@ -92,10 +92,8 @@ for m = 1:length(KDE)
 %         sessions_to_plot = [1 2 6 7]; % This is base 01, base02, pre and post. skip base03,04,05 and sub03 (low trial count)
         sessions_to_plot = 1:7;
    end
-    
-    KDE(m).Name = KDE(m).Name;
-%     sessions_to_plot = 6;
-    
+
+    %     sessions_to_plot = 6;
     for i = 1:length(sessions_to_plot)
         sessn = sessions_to_plot(i);
         %         units_to_plot = 1:length(KDE(m).Sessions(sessn).UnitInfo);
@@ -109,9 +107,9 @@ for m = 1:length(KDE)
             boot_diffs = abs(boot_diffs); % just look at magnitude, not sign
             
             % Reshape to prepare for fixed boundary calculation
-            boot_diffs = reshape(boot_diffs, 1, numel(boot_diffs));
+            boot_diffs_linear = boot_diffs(:);
             
-            percentile_diff = prctile(boot_diffs, pct);
+            percentile_diff = prctile(boot_diffs_linear, pct);
             exceedid = 'ExceedBD_FixedBound';
             times = find(abs(true_diffs) > percentile_diff); % normalized times in ms where true diffs exceeds bootstrapped diffs
             KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid) = times;
@@ -121,6 +119,21 @@ for m = 1:length(KDE)
 %                 fprintf('Monkey %s, session %d, unit %d \n', KDE(m).Code, sessn, unit)
 %             end
             
+
+            % Do the same thing but hold-one-out for each bootstrap
+            % iteration. This will give us a distribution of timecourses
+            % later to do statistics with.
+            nBoots = size(boot_diffs,1);
+            holdOneOutN = (nBoots - 1)*size(boot_diffs,2);
+            rows = 1:nBoots;
+            boot_times = cell(1, nBoots);
+            for iB = 1:nBoots
+                boot_diffs_linear = reshape(boot_diffs(rows(~ismember(rows, iB)),:),1, holdOneOutN);
+                percentile_diff = prctile(boot_diffs_linear, pct);
+                boot_times{iB} = find(abs(boot_diffs(iB,:)) > percentile_diff);
+            end
+            shuffle_id = 'ExceedBD_FixedBound_HoldOneOutShuffle';
+            KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(shuffle_id) = boot_times; 
         end
     end
 end
@@ -310,7 +323,7 @@ for m = 1:length(KDE)
     end
     set(gcf, 'Renderer', 'Painters');
     set(gcf, 'Color', 'white');
-    saveas(gcf, sprintf('pv_KDEs_heatmaps mk%s', KDE(m).Code), 'epsc')
+%     saveas(gcf, sprintf('pv_KDEs_heatmaps mk%s', KDE(m).Code), 'epsc')
 end
 
 %% Plot avg timecourses (cat/dog diff) with days overlaid (learning)
@@ -482,11 +495,9 @@ chi_sq_alpha = 0.05;
 colors = cbrewer('qual', 'Dark2', 3);
 colors = colors([3 2 1], :);
 range_normalize = false;
-
-% Pre allocate
-pre_data = cell(length(KDE), length(areas_to_plot));
-post_data = cell(length(KDE), length(areas_to_plot));
-chi_sq_inds = 200:50:700; % inds in kde_x_vals to test...corresponds to -200:50:500 in real time.
+nShuff = 50;
+ttestAlpha = 0.05;
+xInds_to_integrate = 201:701; % xvals of 0 to 500
 
 
 for m = 1:length(KDE)
@@ -504,6 +515,8 @@ for m = 1:length(KDE)
     figure2('Position', [200 200 1200 330]) % for arrays
 %     figure2('Position', [400 400 500 300]) % just te
     hold on
+    
+    latencies = zeros(length(sessions_to_plot), length(areas_to_plot));
     
     for a = 1:length(areas_to_plot)
         area = areas_to_plot{a};
@@ -554,6 +567,7 @@ for m = 1:length(KDE)
                 unit = units_to_plot(j);
                 switch boundary
                     case 'static'
+                        % Get real data
                         exceedid = 'ExceedBD_FixedBound';
                         heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
                     case 'dynamic'
@@ -567,30 +581,80 @@ for m = 1:length(KDE)
             % Calculate mean
             heatmap_mean = mean(heatmap_mat); % 1 x num xvals
             
-            % Set xvals to use
-            xvals = 1:length(heatmap_mean);
-            
-            % Convert to CDFs
-            data = zeros(1, length(heatmap_mean));
-            for iX = 1:length(data)
-                data(iX) = trapz(heatmap_mean(1:iX));
+            % Get data and means sfor shuffled data
+            heatmap_mat_means_shuffled = zeros(nShuff, length(kde_x_vals));
+            heatmap_mat_stds_shuffled = zeros(nShuff, length(kde_x_vals));
+            shuffle_id = 'ExceedBD_FixedBound_HoldOneOutShuffle';
+            for iS = 1:nShuff
+                heatmap_mat_SHUFF = zeros(length(units_to_plot), length(kde_x_vals));
+                for j = 1:length(units_to_plot)
+                    unit = units_to_plot(j);
+                    try
+                        heatmap_mat_SHUFF(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(shuffle_id){iS}) = 1;
+                    end
+                end
+                heatmap_mat_means_shuffled(iS, :) = mean(heatmap_mat_SHUFF); % 1 x num x vals
             end
             
+            % Set xvals to use
+%             xvals = 1:length(heatmap_mean);
+%             xvals = -200:500;
+            
+            % Convert to CDFs and run ttest
+            data = zeros(1, length(xInds_to_integrate));
+            shuffled_data = zeros(1, length(xInds_to_integrate), nShuff);
+            signf_bools = zeros(1, length(xInds_to_integrate));
+            for iX = 1:length(data)
+                data(iX) = trapz(heatmap_mean(xInds_to_integrate(1:iX)));
+                for iS = 1:nShuff
+                    itd = trapz(heatmap_mat_means_shuffled(iS, xInds_to_integrate(1:iX)));
+                    shuffled_data(1, iX, iS) = itd;
+                end
+                [signf_bools(iX),pval] = ttest2(data(iX), shuffled_data(1, iX, :), 'Alpha', ttestAlpha);
+            end
+            
+            % Clean up signf bools
+            signf_bools(isnan(signf_bools)) = 0;
+            signf_bools = logical(signf_bools);
+            
+            % Range normalize data?
             if range_normalize
                 data = normalize(data, 'range');
             end
             
-            % Plot the data
-            plot(xvals, data, ...
+            % Plot the mean shuffled CDF
+            yvals = mean(shuffled_data, 3);
+            stds = std(shuffled_data, [], 3);
+            errorbar(kde_x_vals(xInds_to_integrate(1:30:end)), yvals(1:30:end), stds(1:30:end), ...
+                '--', ...
+                'LineWidth', 1.5, ...
+                'DisplayName', KDE(m).Sessions(sessn).ShortName,...
+                'Color', colors(col_ind, :))
+%             stdshade(permute(shuffled_data, [3 2 1]), 0.5, colors(col_ind, :), xvals)
+
+            % Plot the CDF
+            plot(kde_x_vals(xInds_to_integrate), data, ...
                 'LineWidth', 1.5, ...
                 'DisplayName', KDE(m).Sessions(sessn).ShortName,...
                 'Color', colors(col_ind, :))
             
+            % Plot the signf timepoints
+            if sum(signf_bools) > 0
+                yl = ylim;
+                plot(kde_x_vals(xInds_to_integrate(signf_bools)), yl(2)*1.03, 'o',  'Color', colors(col_ind, :))
+            end
+            
+            % Store latencies
+            latencies(i, a) = kde_x_vals(xInds_to_integrate(find(signf_bools, 1, 'first')));
+            
+            % Print out latencies (first signf value after zero)
+            fprintf('%s, session %s, %s, latency %d ms \n', ...
+                KDE(m).Name, KDE(m).Sessions(sessn).ShortName, area, latencies(i, a))
+            
             % Format plot
 %             title(sprintf('Monkey %s, %s', KDE(m).Code, area), 'Interpreter', 'none')
             title(sprintf('%s', area), 'Interpreter', 'none')
-            xticks(0:200:600)
-            xticklabels(kde_x_vals(1:200:end))
+            xticks(kde_x_vals(xInds_to_integrate(1:200:end)))
             if strcmp(area, 'te')
                 xlabel('Time from cue on')
                 ylabel('Fraction units')
@@ -604,11 +668,9 @@ for m = 1:length(KDE)
             end
         end
         
-        % Do stats testing
-        
         % Format the plot some more
         if a == 1
-            ylabel('Proportion signf. units')
+            ylabel('Integral from -Inf to t of (proportion of units signf)')
             xlabel('Time from cue on')
         end
         set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
@@ -620,6 +682,26 @@ for m = 1:length(KDE)
     end
     % Format the plot some more
 %     sgtitle(sprintf('Monkey %s', KDE(m).Code))
+
+    % Plot latencies
+    figure2('Position', [300 300 550 450])
+    hold on
+    for a = 1:length(areas_to_plot)
+        plot(latencies(:, a), 'o-', 'LineWidth', 2, 'DisplayName', areas_to_plot{a})
+        xlim([0.5 2.5])
+        xlabel('Session')
+        xticks(1:length(sessions_to_plot))
+        xticklabels({KDE(m).Sessions(sessions_to_plot).ShortName})
+        ylabel('Category latency')
+        ylim([0 250])
+        yticks(0:50:250)
+        set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+            'XMinorTick', 'off', 'YMinorTick', 'off',...
+            'fontsize',26, ...
+            'fontname', 'Helvetica', ...
+            'XColor', 'black', 'YColor', 'black')
+    end
+    legend('Location', 'northeastoutside')
 end
 
 %% Duration of signf cat/dog diffs (pre/post overlay)
