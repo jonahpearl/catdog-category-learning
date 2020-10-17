@@ -486,6 +486,7 @@ end
 
 % Params
 areas_to_plot = {'anterior', 'middle', 'posterior'};
+area_names = {'Anterior', 'Middle', 'Posterior'}; % because MATLAB cant export a good eps file and there's no easy way to capitalize
 % areas_to_plot = {'te'};
 boundary = 'static'; % static or dynamic
 % Not convinced correction is needed in this case.
@@ -498,7 +499,7 @@ range_normalize = false;
 nShuff = 50;
 ttestAlpha = 0.05;
 xInds_to_integrate = 201:701; % xvals of 0 to 500
-
+savePath = '/Users/jonahpearl/Documents/BJR group/Catdog paper/';
 
 for m = 1:length(KDE)
     
@@ -512,7 +513,7 @@ for m = 1:length(KDE)
     
     
     % Set up figure
-    figure2('Position', [200 200 1200 330]) % for arrays
+    figure2('Position', [200 200 1200 350]) % for arrays
 %     figure2('Position', [400 400 500 300]) % just te
     hold on
     
@@ -581,7 +582,7 @@ for m = 1:length(KDE)
             % Calculate mean
             heatmap_mean = mean(heatmap_mat); % 1 x num xvals
             
-            % Get data and means sfor shuffled data
+            % Get data and means for shuffled data
             heatmap_mat_means_shuffled = zeros(nShuff, length(kde_x_vals));
             heatmap_mat_stds_shuffled = zeros(nShuff, length(kde_x_vals));
             shuffle_id = 'ExceedBD_FixedBound_HoldOneOutShuffle';
@@ -653,7 +654,7 @@ for m = 1:length(KDE)
             
             % Format plot
 %             title(sprintf('Monkey %s, %s', KDE(m).Code, area), 'Interpreter', 'none')
-            title(sprintf('%s', area), 'Interpreter', 'none')
+%             title(sprintf('%s', area_names{a}), 'Interpreter', 'none')
             xticks(kde_x_vals(xInds_to_integrate(1:200:end)))
             if strcmp(area, 'te')
                 xlabel('Time from cue on')
@@ -670,19 +671,18 @@ for m = 1:length(KDE)
         
         % Format the plot some more
         if a == 1
-            ylabel('Integral from -Inf to t of (proportion of units signf)')
+            ylabel({'Cumulative significant', 'category coding (AU)'})
             xlabel('Time from cue on')
         end
         set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
             'XMinorTick', 'off', 'YMinorTick', 'off',...
-            'fontsize',26, ...
-            'fontname', 'Helvetica', ...
-            'XColor', 'black', 'YColor', 'black')
+            'fontsize',26)
         
     end
     % Format the plot some more
 %     sgtitle(sprintf('Monkey %s', KDE(m).Code))
-
+    saveas(gcf, fullfile(savePath, sprintf('%s_KDEdiff_cumDist', KDE(m).Name)), 'epsc')
+    
     % Plot latencies
     figure2('Position', [300 300 550 450])
     hold on
@@ -702,6 +702,8 @@ for m = 1:length(KDE)
             'XColor', 'black', 'YColor', 'black')
     end
     legend('Location', 'northeastoutside')
+    set(gcf,'renderer','Painters')
+    saveas(gcf, fullfile(savePath, sprintf('%s_KDEdiff_cumDist_latencies', KDE(m).Name)), 'epsc')
 end
 
 %% Duration of signf cat/dog diffs (pre/post overlay)
