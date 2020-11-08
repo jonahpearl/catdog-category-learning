@@ -29,9 +29,14 @@ cluster_alpha = 0.05;
 % ID = 570049; % te and the three individual arrays, matching at 75%, with shuffle.
 % ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
 % ID = 439280; % te, no matching, with 5x shuffle.
-ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
+% ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
 % ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
 % ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
+% ID = 754886; % all locs, matching, no shuffle, all days, all ints.
+    % This one isn't good for Max, b/c three of his baseline days have very
+    % low trial counts, and it drags down the decoding accuracy for the
+    % other four.
+ID = 93591; % all locs, no matching, no shuffle, all days, all ints.
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -69,15 +74,15 @@ end
 %% Choose what to plot
 
 % Choose sessions.
-rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
-% rSessionsByMonk = {[1 2 3 5 6 7 8 9], 1:7};
+% rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
+rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-rArrayLocs = {'te'};
+% rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
      
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
 
@@ -148,7 +153,7 @@ end
 plot_alpha = 0.4; % transparency of sem fill
 mkYLims = {[0.45 0.85], [0.45 0.65]};
 
-
+%     figure2('Position', [400 400 1000 600])
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     
@@ -158,14 +163,24 @@ for m = 1:length(Monkeys)
     
     % Prepare figure
     figure2('Position', [400 400 1000 600])
+%     subplot(2,1,m)
     hold on
     
     for iLoc = 1:length(rArrayLocs)
         loc = rArrayLocs{iLoc};
         
         % New subplot for each array location
-        subplot(2, ceil(length(rArrayLocs)/2), iLoc)
-        hold on
+%         subplot(2, ceil(length(rArrayLocs)/2), iLoc)
+%         hold on
+
+        % Big TE with smaller arrays underneath
+        if strcmp(loc, 'te')
+            subplot(2, 3,[1 2 3])
+            hold on
+        else
+            subplot(2,3,iLoc+2)
+            hold on
+        end
         
         for i = 1:length(rSessions)
             sessn = rSessions(i);
@@ -191,10 +206,12 @@ for m = 1:length(Monkeys)
             % Plot a line for each session with filled sem.
             % mlc() is a function to get the RGB vals for the default
             % MATLAB colors.
-            plot(starts, meanVector, '-', 'LineWidth', 2, 'Color', mlc(i))
+            plot(starts, meanVector, '-', 'LineWidth', 2, 'Color', mlc(i),...
+                'DisplayName', Data(m).Sessions(sessn).ShortName)
             fill([starts fliplr(starts)],...
                 [meanVector + semVector, fliplr(meanVector - semVector)], mlc(i),...
-                'FaceAlpha', plot_alpha,'linestyle','none');
+                'FaceAlpha', plot_alpha,'linestyle','none', ...
+                'HandleVisibility', 'off');
             
             % Plot signf inds
             sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
@@ -210,17 +227,16 @@ for m = 1:length(Monkeys)
             if iLoc == 1
                 xlabel('Time from cue on (ms)')
                 ylabel('SVM accuracy')
+                legend('Location', 'eastoutside')
             end
             
             % Make graphs have the same y-axes within each monkey
             ylim(mkYLims{m})
             
-            
-            
             % Detailed labels if desired
             %             ylabel('SVM abcat accuracy (mean +/- SEM)')
             title(sprintf('%s', loc), 'Interpreter', 'none')
-            %             legend()
+            
             
             % Make the plot look nice
             formatSVMPlot(gca, gcf)
@@ -236,8 +252,8 @@ end
 
 %% Plot "bars and stars" for a particular timepoint
 
-% mkYLims = {[0.45 0.85], [0.45 0.65]};
-allYlims = [0.48 0.82];
+mkYLims = {[0.45 0.85], [0.45 0.65]};
+% allYlims = [0.48 0.82];
 % singleInterval = [275 375];
 singleInterval = [175 275];
 
@@ -277,12 +293,27 @@ for m = 1:length(Monkeys)
         % Plot line for multiple sessions
         % mlc() is a function to get the RGB vals for the default
         % MATLAB colors.
-        errorbar(1:length(rSessions), accMeans(:,1,iLoc), accSems(:,1,iLoc),...
+%         errorbar(1:length(rSessions), accMeans(:,1,iLoc), accSems(:,1,iLoc),...
+%             '-',...
+%             'LineWidth', 2,...
+%             'Color', mlc(iLoc),...
+%             'DisplayName', loc)
+
+        % Baseline days
+        errorbar(1:length(rSessions)-2, accMeans(1:end-2,1,iLoc), accSems(1:end-2,1,iLoc),...
             '-',...
             'LineWidth', 2,...
             'Color', mlc(iLoc),...
             'DisplayName', loc)
-        
+
+        % pre and post
+        errorbar(length(rSessions)-1:length(rSessions), accMeans(end-1:end,1,iLoc), accSems(end-1:end,1,iLoc),...
+            '-',...
+            'LineWidth', 2,...
+            'Color', mlc(iLoc),...
+            'HandleVisibility', 'off')
+
+
         % Stats testing if only two sessions (pre and post)
         sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d', loc, rSessions(1), rSessions(2));
         if numel(rSessions)==2 && ismember(interval(1), starts(Monkeys(m).(sigID)))
@@ -293,16 +324,16 @@ for m = 1:length(Monkeys)
         
         % Add labels
         ylabel('SVM accuracy')
-%         xticklabels({Data(m).Sessions(rSessions).ShortName})
-%         xtickangle(45)
-        xticklabels({'Pre', 'Post'})
+        xticklabels({Data(m).Sessions(rSessions).ShortName})
+        xtickangle(45)
+%         xticklabels({'Pre', 'Post'})
         xticks(1:length(rSessions))
         xlim([0.5 0.5+length(rSessions)])
-%         legend
+        legend
         
         % Make graphs have the same y-axes within each monkey
-%         ylim(mkYLims{m})
-        ylim(allYlims)
+        ylim(mkYLims{m})
+%         ylim(allYlims)
 
         % Make the plot look nice
         formatSVMPlot(gca, gcf)
@@ -310,10 +341,89 @@ for m = 1:length(Monkeys)
 end
 % sgtitle(sprintf('%d to %d', interval(1), interval(2)))
 % Save the plots
-pause(0.5)
-saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%d_%s_%d_to_%d', sigID, ID, loc, interval(1), interval(2))), 'epsc')
+% pause(0.5)
+% saveas(gcf, fullfile(figureSavePath, sprintf('SVM_%s_%d_%s_%d_to_%d', sigID, ID, loc, interval(1), interval(2))), 'epsc')
+
+%% Prep data for bar plot below
+
+saveDir = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/XMA2/SVM bins data';
+
+intervals_to_use = {[175 225], [175 275], [175 350]};
+sessions_to_compare_byMonk = {[1 6], [7 9]; [1 5], [6 7]}; % (monk) x (base or test)
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+
+% Each bin size should be a row of data. 
+% Cols: Loc1_base, loc1_test, loc2_base, loc2_test, etc.
+for m = 1:length(Data)
+    baseSessns = sessions_to_compare_byMonk{m,1};
+    testSessns = sessions_to_compare_byMonk{m,2};
+    
+    data = zeros(length(intervals_to_use), length(rArrayLocs)*2);
+    
+    for iInt = 1:length(intervals_to_use)
+        interval = intervals_to_use{iInt};
+        for iLoc = 1:length(rArrayLocs)
+            loc = rArrayLocs{iLoc};
+            
+            kflID = get_good_interval_name2(interval, loc, 'KFL');
+
+            % Get baseline data
+            base1_kfls = Data(m).Sessions(baseSessns(1)).(kflID);
+            base2_kfls = Data(m).Sessions(baseSessns(2)).(kflID);
+            base1_kfls = base1_kfls(:);
+            base2_kfls = base2_kfls (:);
+            
+            % Get test data
+            test1_kfls = Data(m).Sessions(testSessns(1)).(kflID);
+            test2_kfls = Data(m).Sessions(testSessns(2)).(kflID);
+            test1_kfls = test1_kfls(:);
+            test2_kfls = test2_kfls (:);
+            
+            % Store
+            data(iInt, iLoc*2 - 1) = mean(1 - base1_kfls) - mean(1 - base2_kfls);
+            data(iInt, iLoc*2) = mean(1 - test1_kfls) - mean(1 - test2_kfls);
+        end
+    end
+end
+
+%% Bar plot of changes as function of bin size
+
+figure
+pairedbar(data, [], 0.8)
+
 
 %% Functions
+
+function pairedbar(data, group_cols, lightenBy)
+    % data: (num x-axis points) x (num groups) matrix of data. Columns
+    % should be arranged as group1_1, group1_2, group2_1, group2_2, etc.
+    % group_cols: 1 x (num groups)/2 vector of colors. Default: mlc.
+    % lightenBy: factor to lighten the group color by for the first bar in
+    % each group. Between 0 and 1. Default: 0.5.
+    
+    if mod(size(data,2),2) == 1
+        error('Data must have an even number of cols (groups)')
+    end
+    
+    if isempty(group_cols)
+        group_cols = mlc(1:size(data,2)/2);
+    end
+    
+    if isempty(lightenBy)
+        lightenBy = 0.5;
+    end
+    
+    b = bar(data, 'grouped');
+    
+    for iGroup = 1:size(data,2)/2
+        b(iGroup*2 - 1).FaceColor = lightenBy + (1-lightenBy)*group_cols(iGroup, :);
+        b(iGroup*2).FaceColor = group_cols(iGroup, :);
+        b(iGroup*2 - 1).EdgeColor = group_cols(iGroup, :);
+        b(iGroup*2).EdgeColor = group_cols(iGroup, :);
+    end
+    
+end
+
 function formatSVMPlot(ax, fig)
 set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
     'XMinorTick', 'off', 'YMinorTick', 'off',...

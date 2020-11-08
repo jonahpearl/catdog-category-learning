@@ -132,6 +132,11 @@ for m = 1:length(Monkeys)
             yval = max(nSig ./ nTotal);
             plot(1:length(rSessions), repelem(yval*1.02, 1, 2), 'k-')
             scatter(1.5, yval*1.05, 'k*')
+            [h, pval, chistat, df] = prop_test([nSig(1) nSig(2)], [nTotal(1) nTotal(2)], false, glm_alpha);
+            fprintf('%s, session %s vs %s, signf. incr. in glm signf units (p = %d, chisq %0.5f, df %d \n',...
+                Monkeys(m).Name,...
+                Monkeys(m).Sessions(rSessions(1)).ShortName, Monkeys(m).Sessions(rSessions(2)).ShortName, ...
+                pval, chistat, df)
         end
         
         
@@ -154,7 +159,7 @@ end
 % sgtitle(sprintf('%d to %d', interval(1), interval(2)))
 % Save the plots
 % pause(0.5)
-saveas(gcf, fullfile(figureSavePath, sprintf('GLM_%g_%s_%d_to_%d', ID, loc, interval(1), interval(2))), 'epsc')
+% saveas(gcf, fullfile(figureSavePath, sprintf('GLM_%g_%s_%d_to_%d', ID, loc, interval(1), interval(2))), 'epsc')
 
 %% Functions
 function formatGLMPlot(ax, fig)

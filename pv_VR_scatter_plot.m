@@ -127,9 +127,6 @@ for m = 1:length(Monkeys)
                 
                 % Calculate correlation
                 x = corrcoef(cat_props, dog_props);
-                fprintf('%s, %s, %s, interval %d to %d, correlation %0.2f \n', ...
-                    Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName, areas_to_plot{a}, test_int(1), test_int(2), x(1,2))
-                
                 
                 % Get angle of best-fit line with major axis regression
                 % method. I checked this function against a reference, it's
@@ -139,6 +136,12 @@ for m = 1:length(Monkeys)
                 theta_bounds = rad2deg(atan(coeff_ints(2,:)));
                 intercept = coeffs(1);
                 intercept_bounds = coeff_ints(1,:);
+                
+                % Print for easy reference
+                fprintf('%s, %s, %s, interval %d to %d, correlation %0.2f, slope %0.2f \n', ...
+                    Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
+                    areas_to_plot{a}, test_int(1), test_int(2),...
+                    x(1,2), tan(theta/180*pi))
                 
                 % Calculate distance from points to regression line:
                 % D = abs(ax0+by0+c) / sqrt(a^2+b^2), where point is
@@ -410,7 +413,7 @@ for m = 1:length(Monkeys)
     set(gcf, 'Color', 'w')
 end
 % sgtitle(sprintf('%s, slopes of major-axis regression, VR alpha %0.2f', area_to_plot, vr_alpha), 'Interpreter', 'none')
-saveas(gcf, fullfile(figureSavePath, sprintf('VR_slopes_%s', m, sessn, slope_id)), 'epsc')
+% saveas(gcf, fullfile(figureSavePath, sprintf('VR_slopes_%s', m, sessn, slope_id)), 'epsc')
 
 %% Functions
 function formatPlot(ax, fig)

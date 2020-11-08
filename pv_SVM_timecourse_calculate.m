@@ -50,7 +50,7 @@ matchInputSizes = false; % make input matrices all same size (control) ?
     proportion_of_min_pop_size = 0.75; 
     proportion_of_min_trials = 0.75;
     nRandomSubsamples = 20;
-manuallyReduceIntervals = true; % test a subset of all the intervals for faster testing
+manuallyReduceIntervals = false; % test a subset of all the intervals for faster testing
     manualIntervals = {[75 175] [175 275] [275 375]};
 kfold_num = 5; % k-fold cross validation. 
 % Note that folds are not generated purely randomly -- we impose
@@ -139,7 +139,7 @@ for m = 1:length(Monkeys)
                 subBool{iLoc} = ismember({Monkeys(m).Sessions(i).UnitInfo.Location}, rArrayLocs{iLoc});
             end
             
-            % Add enough spikes data
+            % Add enoughSpikes bools
             subBool{iLoc} = subBool{iLoc} & enoughSpikesBool;
         end
         
@@ -206,7 +206,7 @@ for m = 1:length(Monkeys)
                 interval = rIntervals{iInt};
                 
                 % Find index in X's 3rd dim for requested interval
-                idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
+                int_idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
                 
                 % Pre-allocate the storage vector for the SVMs.
                 kflValues = zeros(nRandomSubsamples*kfold_num,1);
@@ -224,11 +224,11 @@ for m = 1:length(Monkeys)
                     if matchInputSizes
                         trial_idx = randsample(size(X,1), numTrials);
                         unit_idx = randsample(size(X,2), numUnits);
-                        X_subset = X(trial_idx, unit_idx, idx); % data for only those trials and a random loc of neurons
+                        X_subset = X(trial_idx, unit_idx, int_idx); % data for only those trials and a random loc of neurons
                         Y_subset = Y(trial_idx); % ground truth category for those trials
                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID(trial_idx); % image IDs for those trials
                     else
-                        X_subset = X(:,:, idx);
+                        X_subset = X(:,:, int_idx);
                         Y_subset = Y;
                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID;
                     end
