@@ -32,16 +32,24 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% Prepare list of intervals
-first_time = -100;
-last_time = 450;
-width = 100;
-step = 5;
-starts = first_time:step:last_time;
-rIntervals = cell(1, length(starts)); % "relevant Intervals"
-for i = 1:length(starts)
-    rIntervals{i} = [starts(i) (starts(i) + width)];
-end
+%% Parameters
+
+% *** For time course ***
+% first_time = -100;
+% last_time = 450;
+% width = 100;
+% step = 5;
+% starts = first_time:step:last_time;
+% rIntervals = cell(1, length(starts)); % "relevant Intervals"
+% fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % double %% escapes the first %s
+% for i = 1:length(starts)
+%     rIntervals{i} = [starts(i) (starts(i) + width)];
+% end
+
+% For simpler analyses
+rIntervals = {[175 225], [175 275], [175 350]};
+fname_base = sprintf('%%s_allNeurons_variableBin_1.mat');
+
 
 %% Collect spike count data for all neurons
 
@@ -51,8 +59,8 @@ end
 catgs = {1:260, 261:520};
 spikeCountPath = 'XMA2/Spike_count_mats';
 
-% for m = 1:length(Monkeys)
-for m = 2
+for m = 1:length(Monkeys)
+% for m = 2
     rSessions = 1:length(Monkeys(m).Sessions); % "relevant sessions"
     
     for i = 1:length(rSessions)
@@ -90,7 +98,7 @@ for m = 2
         
         % Generate file name.
         MonkID = sprintf('%s_%s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName);
-        fileName = sprintf('%s_allNeurons_step%d_wd%d.mat', MonkID, step, width);
+        fileName = sprintf(fname_base, MonkID);
         
         % Check if file will be too big. If so, split it.
         t = whos('X');
@@ -108,7 +116,7 @@ for m = 2
     end
 end
 
-%% Add unit information to 
+
 
 %% Functions
 function vals = getSpikesInInt(sortedSpikeTimes, timesOn1, timesOn2, int)
