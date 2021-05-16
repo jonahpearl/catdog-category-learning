@@ -7,7 +7,7 @@ close all
 % Define paths to data
 EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
 CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
-pv_path = 'XMA2/Monkey_structs';
+pv_path = 'XMA2/Monkey_structs'; % pv --> "passive viewing"
 
 % Pick KDE bandwidth parameter and load
 bw = 20;
@@ -65,10 +65,12 @@ for m = 1:length(KDE)
         KDE(m).Sessions_to_use = [7 9];
         KDE(m).XTickLabs= {'Pre', 'Post'};
 
-        KDE(m).Sessions_to_use = [7 9];
-        KDE(m).XTickLabs= {'Pre', 'Post'};
+%         KDE(m).Sessions_to_use = [7 9];
+%         KDE(m).XTickLabs= {'Pre', 'Post'};
         KDE(m).Code = 'R';
     elseif strcmp(KDE(m).Name, 'Max_fix_cat_xma2')
+        KDE(m).Sessions_to_use = [1 2 3 4 5 6 7];
+        KDE(m).XTickLabs = {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
 %         KDE(m).Sessions_to_use = [1 2 6 7];
 %         KDE(m).XTickLabs = {'Base 1', 'Base 2', 'Pre', 'Post'};
         KDE(m).Sessions_to_use = [6 7];
@@ -123,20 +125,34 @@ for m = 1:length(KDE)
             % Do the same thing but hold-one-out for each bootstrap
             % iteration. This will give us a distribution of timecourses
             % later to do statistics with.
-            nBoots = size(boot_diffs,1);
-            holdOneOutN = (nBoots - 1)*size(boot_diffs,2);
-            rows = 1:nBoots;
-            boot_times = cell(1, nBoots);
-            for iB = 1:nBoots
-                boot_diffs_linear = reshape(boot_diffs(rows(~ismember(rows, iB)),:),1, holdOneOutN);
-                percentile_diff = prctile(boot_diffs_linear, pct);
-                boot_times{iB} = find(abs(boot_diffs(iB,:)) > percentile_diff);
-            end
-            shuffle_id = 'ExceedBD_FixedBound_HoldOneOutShuffle';
-            KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(shuffle_id) = boot_times; 
+%             nBoots = size(boot_diffs,1);
+%             holdOneOutN = (nBoots - 1)*size(boot_diffs,2);
+%             rows = 1:nBoots;
+%             boot_times = cell(1, nBoots);
+%             for iB = 1:nBoots
+%                 boot_diffs_linear = reshape(boot_diffs(rows(~ismember(rows, iB)),:),1, holdOneOutN);
+%                 percentile_diff = prctile(boot_diffs_linear, pct);
+%                 boot_times{iB} = find(abs(boot_diffs(iB,:)) > percentile_diff);
+%             end
+%             shuffle_id = 'ExceedBD_FixedBound_HoldOneOutShuffle';
+%             KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(shuffle_id) = boot_times; 
         end
     end
 end
+
+%% (Optional) Save data
+save_path = fullfile(EXT_HD, 'XMA2/Monkey_structs/MaxMarta_KDEDiffs_HoldOneOut_results.mat');
+[status, vnames] = split_monkeyStruct_in_parts(KDE);
+save(save_path, vnames{:}, 'bw', 'pct'); 
+
+%% (Optional) Load saved data
+EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
+CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
+save_path = fullfile(EXT_HD, 'XMA2/Monkey_structs/MaxMarta_KDEDiffs_HoldOneOut_results.mat');
+Data = load(save_path);
+bw = Data.bw; pct = Data.pct; Data = rmfield(Data, {'bw', 'pct'});
+[status, KDE] = stitch_monkeyStruct_from_parts(Data);
+clear Data
 
 %% Plot results as heatmap
 
@@ -281,7 +297,7 @@ for m = 1:length(KDE)
             unit_inds = find(strcmp(array_list, uq{j}));
             array_end_ind = max(unit_inds);
             ytick_spots(j) = round(median(unit_inds));
-            ytick_labs{j} = sprintf('%s. (%d)', strcat(upper(uq{j}(1)), uq{j}(2:3)), numel(unit_inds));
+%             ytick_labs{j} = sprintf('%s. (%d)', strcat(upper(uq{j}(1)), uq{j}(2:3)), numel(unit_inds));
         end
         
         % Set colormap:
@@ -310,8 +326,10 @@ for m = 1:length(KDE)
             xlabel('Time from cue on (ms)')
             ylabel('Array (# units)')
         end
-        xticks(0:200:700)
-        xticklabels(-200:200:500)
+%         xticks(0:200:700)
+%         xticklabels(-200:200:500)
+        xticks([0 400])
+        xticklabels([0 400])
         ylim([0 max_yval])
         yticks(ytick_spots)
         yticklabels(ytick_labs)
@@ -642,7 +660,7 @@ for m = 1:length(KDE)
             % Plot the signf timepoints
             if sum(signf_bools) > 0
                 yl = ylim;
-                plot(kde_x_vals(xInds_to_integrate(signf_bools)), yl(2)*1.03, 'o',  'Color', colors(col_ind, :))
+%                 plot(kde_x_vals(xInds_to_integrate(signf_bools)), yl(2)*1.03, 'o',  'Color', colors(col_ind, :))
             end
             
             % Store latencies
@@ -681,7 +699,7 @@ for m = 1:length(KDE)
     end
     % Format the plot some more
 %     sgtitle(sprintf('Monkey %s', KDE(m).Code))
-    saveas(gcf, fullfile(savePath, sprintf('%s_KDEdiff_cumDist', KDE(m).Name)), 'epsc')
+%     saveas(gcf, fullfile(savePath, sprintf('%s_KDEdiff_cumDist', KDE(m).Name)), 'epsc')
     
     % Plot latencies
     figure2('Position', [300 300 550 450])
@@ -703,105 +721,163 @@ for m = 1:length(KDE)
     end
     legend('Location', 'northeastoutside')
     set(gcf,'renderer','Painters')
-    saveas(gcf, fullfile(savePath, sprintf('%s_KDEdiff_cumDist_latencies', KDE(m).Name)), 'epsc')
+%     saveas(gcf, fullfile(savePath, sprintf('%s_KDEdiff_cumDist_latencies', KDE(m).Name)), 'epsc')
+end
+
+%% (not finished) Proportion of units showing a signf cat/dog diff
+% Will assess signf with the bootstraps
+
+% Params
+areas_to_plot = {'anterior', 'middle', 'posterior', 'te'};
+
+% Set up fig
+% figure2('Position', [200 200 900 600])
+% hold on
+% tiledlayout(2,3)
+
+for m = 1:length(KDE)
+    for a = 1:length(areas_to_plot)
+        area = areas_to_plot{a};
+        
+        for i = 1:length(sessions_to_plot)
+            sessn = sessions_to_plot(i);
+            switch area
+                case 'te'
+                    units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Area}, 'te'));
+                otherwise
+                    units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Location}, area));
+            end
+            
+            for j = 1:length(units_to_plot)
+                unit = units_to_plot(j);
+                shuffle_id = 'ExceedBD_FixedBound_HoldOneOutShuffle';
+                boot_times = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(shuffle_id);
+                
+            end
+        end
+    end
 end
 
 %% Duration of signf cat/dog diffs (pre/post overlay)
 
 % Parameters
 ranksum_alpha = 0.01;
+areas_to_plot = {'anterior', 'middle', 'posterior', 'te'};
+figs_path = '/Users/jonahpearl/Documents/BJR group/Catdog paper';
 
-% To plot both mks together
-figure2('Position', [200 200 1000 1000])
-hold on
-
-for m = 1:length(KDE)
-    sessions_to_plot = KDE(m).Sessions_to_use;
-  
-    % Arrange subplots
-    subplot(2,1,m)
+for a = 1:length(areas_to_plot)
+    area = areas_to_plot{a};
+    
+    % Plot both mks together
+%     figure2('Position', [200 200 1000 1000])
+    figure2('Position', [200 200 300 300])
     hold on
     
-    for i = 1:length(sessions_to_plot)
-        sessn = sessions_to_plot(i);
-        units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Area}, 'te'));
-        runs = cell(length(units_to_plot), 2); % runs of significant KDE difference. First col is start time in ms of run, second col is length of run.
+    for m = 1:length(KDE)
+        sessions_to_plot = KDE(m).Sessions_to_use;
+        % Arrange subplots
+        subplot(2,1,m)
+        hold on
+
+        for i = 1:length(sessions_to_plot)
+            sessn = sessions_to_plot(i);
+            switch area
+                case 'te'
+                    units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Area}, 'te'));
+                otherwise
+                    units_to_plot = find(strcmp({KDE(m).Sessions(sessn).UnitInfo.Location}, area));
+            end
+            runs = cell(length(units_to_plot), 2); % runs of significant KDE difference. First col is start time in ms of run, second col is length of run.
+
+            for j = 1:length(units_to_plot)
+                unit = units_to_plot(j);
+
+                % Get data
+                exceedid = 'ExceedBD_FixedBound';
+                exceed_bd_inds = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid);
+                actual_xvals = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.KDEXVals;
+                max_val = length(actual_xvals);
+
+                % Catch units with no signf time points
+                if isempty(exceed_bd_inds)
+                    runs{j,1} = 0;
+                    runs{j,2} = 0;
+                    continue
+                end
+
+                % Convert to string of zeros and ones for calculating run
+                % length.
+                exceed_bd_bools = zeros(1, max_val);
+                exceed_bd_bools(exceed_bd_inds) = 1;
+                s = sprintf('%d', exceed_bd_bools);
+
+                % Calculate run length with some MATLAB magic.
+                runs{j,1} = (find(diff(uint8(s)))+1)'; % inds of first 1 in each run of 1's
+                s = textscan(s, '%s', 'delimiter', '0', 'multipleDelimsAsOne',1); % all runs of 1s
+                s = s{:}; % unpack
+                runs{j,2} = cellfun('length', s); % length of each run
+            end
+
+            % Concatenate all the run lengths across all units into one
+            % vector. Works even when one unit has multiple runs.
+            data = vertcat(runs{:,2});
+
+            % Remove zeros -- we're only interested in units with a significant
+            % cat/dog difference
+            data(data == 0) = [];
+
+            % Plot the data as a histogram        
+            histogram(data, 'BinEdges', [0:20:500 Inf], ... % 500
+                'Normalization', 'probability', 'DisplayName', KDE(m).Sessions(sessn).ShortName)
+
+            % Store the data
+            run_id = sprintf('KDE_EBD_Runs_%s', area); 
+            KDE(m).Sessions(sessn).(run_id)= runs;
+            if strcmp('Post', regexp(KDE(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once'))
+                post_data = data;
+            end
+
+            % Format the plot
+%             title(sprintf('Lengths of signf. runs, %s, session %s, %s',...
+%                 KDE(m).Name, KDE(m).Sessions(sessn).ShortName, area), 'Interpreter', 'none')
+            title(sprintf('%s, %s', KDE(m).Name, area), 'interpreter', 'none')
+%             ylim([0 0.3])
+            yticks(0:0.1:0.2)
+    %         legend
+            if i == 1 && m == 1
+%                 xlabel('Run lengths of cat/dog significanct differences (ms)')
+                xlabel('Run length (ms)')
+    %             ylabel({'Probability across all runs','(Not norm''d to num unts)'})
+                ylabel('Probability')
+            end
+            set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+                'XMinorTick', 'off', 'YMinorTick', 'off',...
+                'fontsize',14, ...
+                'fontname', 'Helvetica', 'fontweight', 'normal', ...
+                'XColor', 'black', 'YColor', 'black')
+        end
         
-        for j = 1:length(units_to_plot)
-            unit = units_to_plot(j);
-            
-            % Get data
-            exceedid = 'ExceedBD_FixedBound';
-            exceed_bd_inds = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid);
-            actual_xvals = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.KDEXVals;
-            max_val = length(actual_xvals);
-            
-            % Catch units with no signf time points
-            if isempty(exceed_bd_inds)
-                runs{j,1} = 0;
-                runs{j,2} = 0;
+        % Run stats testing
+        for i = 1:length(sessions_to_plot)
+            sessn = sessions_to_plot(i);
+            if strcmp('Post', regexp(KDE(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once'))
                 continue
             end
-            
-            % Convert to string of zeros and ones for calculating run
-            % length.
-            exceed_bd_bools = zeros(1, max_val);
-            exceed_bd_bools(exceed_bd_inds) = 1;
-            s = sprintf('%d', exceed_bd_bools);
-            
-            % Calculate run length with some MATLAB magic.
-            runs{j,1} = (find(diff(uint8(s)))+1)'; % inds of first 1 in each run of 1's
-            s = textscan(s, '%s', 'delimiter', '0', 'multipleDelimsAsOne',1); % all runs of 1s
-            s = s{:}; % unpack
-            runs{j,2} = cellfun('length', s); % length of each run
+            run_id = sprintf('KDE_EBD_Runs_%s', area); 
+            runs = KDE(m).Sessions(sessn).(run_id);
+            data = vertcat(runs{:,2});
+            if isempty(data)
+                fprintf('%s, session %d, area %s: no signf timepoints \n', KDE(m).Name, sessn, area, h, p)
+                continue
+            end
+            [p,h] = ranksum(data, post_data, 'Alpha', ranksum_alpha, 'tail', 'left');
+            fprintf('%s, session %d, area %s: h = %d, p = %0.3f \n', KDE(m).Name, sessn, area, h, p)
         end
-        
-        % Concatenate all the run lengths across all units into one
-        % vector. Works even when one unit has multiple runs.
-        data = vertcat(runs{:,2});
-        
-        % Remove zeros -- we're only interested in units with a significant
-        % cat/dog difference
-        data(data ==0) = [];
-        
-        % Plot the data as a histogram        
-        histogram(data, 'BinEdges', 0:10:500, ...
-            'Normalization', 'probability', 'DisplayName', KDE(m).Sessions(sessn).ShortName)
-        
-        % Store the data
-        KDE(m).Sessions(sessn).KDE_EBD_Runs = runs;
-        if strcmp('Post', regexp(KDE(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once'))
-            post_data = data;
-        end
-        
-        % Format the plot
-        ylim([0 0.2])
-        yticks(0:0.1:0.2)
-%         legend
-        if i == 1 && m == 1
-            xlabel('Run lengths of cat/dog significanct differences (ms)')
-%             ylabel({'Probability across all runs','(Not norm''d to num unts)'})
-            ylabel('Probability')
-        end
-        set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
-            'XMinorTick', 'off', 'YMinorTick', 'off',...
-            'fontsize',32, ...
-            'fontname', 'Helvetica', 'fontweight', 'normal', ...
-            'XColor', 'black', 'YColor', 'black')
     end
     
-    % Run stats testing
-    for i = 1:length(sessions_to_plot)
-        sessn = sessions_to_plot(i);
-        if strcmp('Post', regexp(KDE(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once'))
-            continue
-        end
-        runs = KDE(m).Sessions(sessn).KDE_EBD_Runs;
-        data = vertcat(runs{:,2});
-        
-        [p,h] = ranksum(data, post_data, 'Alpha', ranksum_alpha);
-        fprintf('%s, session %d: h = %d, p = %0.3f \n', KDE(m).Name, sessn, h, p)
-    end
+    % Save figure
+    save_path = fullfile(figs_path, sprintf('KDE_diffs_duration_%s.png', area));
+%     saveas(gcf, save_path)
 end
 
 % Format the plot more
