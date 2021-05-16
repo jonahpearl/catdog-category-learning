@@ -17,7 +17,8 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 
 % GLM Parameters
 random_seed = 10; % for reproducibility 
-rSessionsByMonk = {[7 9], [6 7]};
+% rSessionsByMonk = {[7 9], [6 7]};
+rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
 runShuffle = false; % run the shuffled condition?
     nShuffles = 100;

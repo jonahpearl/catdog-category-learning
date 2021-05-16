@@ -155,10 +155,12 @@ for m = 1:length(Monkeys)
                 slope_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
                 intercept_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Intercept_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
                 resid_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Resids_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
+                rval_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_RValue_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
                 Monkeys(m).Sessions(sessn).(propn_id) = [cat_props; dog_props]; % 2 x units
                 Monkeys(m).Sessions(sessn).(resid_id) = perpendicular_residuals; % 1 x units
                 Monkeys(m).Sessions(sessn).(slope_id) = [theta_bounds(1) theta theta_bounds(2)]; % 1 x 3
                 Monkeys(m).Sessions(sessn).(intercept_id) = [intercept_bounds(1) intercept intercept_bounds(2)]; % 1 x 3
+                Monkeys(m).Sessions(sessn).(rval_id) = x(1,2); % pearson correlation coeff.
                 
                 % Plot if requested
                 if make_plots
@@ -198,21 +200,25 @@ hold on
 for m = 1:length(Monkeys)
     sessions_to_use = Monkeys(m).Sessions_to_use;
     diffs = cell(1,length(sessions_to_use));
+    resids = cell(1,length(sessions_to_use));
     
     for i = 1:length(sessions_to_use)
         sessn = sessions_to_use(i);
         
         % Get data
         propn_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_CatDogPropns_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
-        slope_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
-        intercept_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Intercept_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         t = Monkeys(m).Sessions(sessn).(propn_id);
         cat_props = t(1,:);
         dog_props = t(2,:);
+        diffs{i} = dog_props - cat_props;
+        slope_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         slope = tan(deg2rad(Monkeys(m).Sessions(sessn).(slope_id)(2)));
+        intercept_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Intercept_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         intercept = Monkeys(m).Sessions(sessn).(intercept_id)(2);
         xvals = 0:0.01:1;
-        diffs{i} = dog_props - cat_props;
+        resid_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Resids_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
+        perpendicular_resids = Monkeys(m).Sessions(sessn).(resid_id);
+        resids{i} = perpendicular_resids;
         
         % ID session name and set some params accordingly.
         switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
@@ -266,23 +272,29 @@ for m = 1:length(Monkeys)
 %             length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
         subplot(length(Monkeys), 1, m)
         hold on
-        histogram(dog_props - cat_props, 'BinEdges', -0.2:0.025:0.2)
+%         histogram(dog_props - cat_props, 'BinEdges', -0.2:0.025:0.2)
+        histogram(perpendicular_resids, 'BinEdges', 0:0.025:0.2)
         ax = gca;
         formatPlot(ax, f2)
         ax.YAxis.Visible = 'off';
         ax.YGrid = 'off';
         ax.XGrid = 'off';
-        ax.XLabel.FontSize = 40;
+%         ax.XLabel.FontSize = 40;
     end
     
 %     % Informative sgtitle if desired
 %     sgtitle(sprintf('Area %s, %d to %d, image VR propns,(alpha = %0.2f)',...
 %         area_to_plot, interval_to_plot(1), interval_to_plot(2), vr_alpha), 'Interpreter', 'none')
 
-    % Run variance tests
+    % Run variance tests on diffs
     [h,pval] = vartest2(diffs{pre_diff_idx}, diffs{post_diff_idx});
-    fprintf('Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
+    fprintf('DIFFS Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
             var(diffs{pre_diff_idx}), var(diffs{post_diff_idx}), h, pval)
+        
+    % Ditto on residuals
+    [h,pval] = vartest2(resids{pre_diff_idx}, resids{post_diff_idx});
+    fprintf('RESIDUALS Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
+            var(resids{pre_diff_idx}), var(resids{post_diff_idx}), h, pval)
 end
 
 % saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
@@ -314,6 +326,138 @@ for m = 1:length(Monkeys)
 %         saveas(gcf, fullfile(figureSavePath, sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
     end
 end
+
+%% Plot CDFs of MAR residuals, and do stats
+
+vr_alpha = 0.05;
+alpha_string_scale_factor = 100;
+% ranksum_alpha = 0.025;
+ranksum_alpha = 0.05;
+test_intervals = {[175 275]};
+
+figure('Position', [400 400 260 430])
+hold on
+
+for m = 1:length(Monkeys)
+    subplot(2,1,m)
+    hold on
+    
+%     if strcmp(Monkeys(m).Name, 'Marta_fix_cat_xma2')
+%         sessions_to_use = [1 2 3 5 6 7 9]; % skip base04 (outlier) and post 01 (low trial count)
+%         %         sessions_to_use = [1 2 7 9];
+%     elseif strcmp(Monkeys(m).Name, 'Max_fix_cat_xma2')
+%         sessions_to_use = [1 2 3 5 6 7]; % skip base04 due to all zeros on scatter plot (low trial count)
+%         %         sessions_to_use = [1 2 6 7];
+%     end
+    
+    sessions_to_use = Monkeys(m).Sessions_to_use;
+    
+    for p = 1:length(test_intervals)
+        test_int = test_intervals{p};
+        %         areas_to_plot = unique({Monkeys(m).Sessions(sessions_to_use(1)).UnitInfo.Area});
+        areas_to_plot = {'te'};
+        
+        for a = 1:length(areas_to_plot)
+            for i = 1:length(sessions_to_use)
+                sessn = sessions_to_use(i);
+                
+                % ***********************************
+                % use selectivity index (cats - dogs)
+                % ***********************************
+                propn_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_CatDogPropns_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
+                t = Monkeys(m).Sessions(sessn).(propn_id);
+                cat_props = t(1,:);
+                dog_props = t(2,:);
+                diffs = abs(cat_props - dog_props);
+                [f, x] = ecdf(diffs);
+                xlabel_str = 'Selectivity (|prop_cat - prop_dog|)';
+                
+                 switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+                    case 'Base'
+%                         col = [0.4 0.4 0.4];
+                        col = epoch_colors(1,:);
+                        thk = 1;
+                    case 'Pre'
+                        %                         col = 'r';
+                        col = [0.4 0.4 0.4];
+                        col = epoch_colors(2,:);
+                        thk = 2;
+                        pre_data = diffs;
+                    case 'Post'
+%                         col = 'g';
+                        col = epoch_colors(3,:);
+                        thk = 2;
+                        post_data = diffs;
+                    case 'Sub'
+                        col = [0.8 0.8 0.8];
+                        thk = 1;
+                 end
+
+                % ***********************************
+                % use residuals from major axis regression
+                % ***********************************
+%                 propn_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_CatDogPropns_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
+%                 resid_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Resids_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
+%                 t = Monkeys(m).Sessions(sessn).(propn_id);
+%                 cat_props = t(1,:);
+%                 dog_props = t(2,:);
+%                 perpendicular_residuals = Monkeys(m).Sessions(sessn).(resid_id);
+%                 
+%                 % control: restrict to only neurons with low num VR imgs
+% %                 units_to_use = (cat_props/2 + dog_props/2) < 0.25;
+% %                 perpendicular_residuals = perpendicular_residuals(units_to_use);
+%                 
+%                 [f, x] = ecdf(perpendicular_residuals);
+%                 xlabel_str = 'Residuals from major axis regression';
+                
+%                 switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+%                     case 'Base'
+% %                         col = [0.4 0.4 0.4];
+%                         col = epoch_colors(1,:);
+%                         thk = 1;
+%                     case 'Pre'
+%                         %                         col = 'r';
+%                         col = [0.4 0.4 0.4];
+%                         col = epoch_colors(2,:);
+%                         thk = 2;
+%                         pre_data = perpendicular_residuals;
+%                     case 'Post'
+% %                         col = 'g';
+%                         col = epoch_colors(3,:);
+%                         thk = 2;
+%                         post_data = perpendicular_residuals;
+%                     case 'Sub'
+%                         col = [0.8 0.8 0.8];
+%                         thk = 1;
+%                 end
+
+                % ***********************************
+                % End differences between diffs and resids
+                % ***********************************
+                
+                plot(x, f, 'Color', col, 'LineWidth', thk, 'DisplayName', Monkeys(m).Sessions(sessn).ShortName)
+            end
+            
+            [pval,h] = ranksum(pre_data, post_data, 'Alpha', ranksum_alpha, 'Tail', 'left');
+            fprintf('%s, %s, %d to %d, pre vs. post ranksum (one-sided non-parametric), hyp %d, pval of %0.4f \n', Monkeys(m).Name, areas_to_plot{a}, test_int(1), test_int(2), h, pval)
+            
+            [h, pval] = ttest2(pre_data, post_data, 'tail', 'left');
+            fprintf('%s, %s, %d to %d, pre vs. post ttest2 (one-sided), hyp %d, pval of %0.4f \n', Monkeys(m).Name, areas_to_plot{a}, test_int(1), test_int(2), h, pval)
+            
+            %             title(sprintf('%s, %s, %d to %d, VR alpha %0.2f', Monkeys(m).Name, areas_to_plot{a}, test_int(1), test_int(2), vr_alpha), 'Interpreter', 'none')
+            %             legend
+            xlabel(xlabel_str)
+            xlim([0 0.2])
+            ylabel('Empirical CDF')
+            set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+                'XMinorTick', 'off', 'YMinorTick', 'off',...
+                'fontsize',18, ...
+                'fontname', 'Helvetica', 'fontweight', 'normal', ...
+                'XColor', 'black', 'YColor', 'black')
+        end
+    end
+end
+set(gcf, 'Color', 'w')
 
 %% Plot slopes of selected MARs
 
@@ -398,7 +542,103 @@ for m = 1:length(Monkeys)
     xticks(1:length(sessions_to_use))
     xticklabs = Monkeys(m).XTickLabs;
 %     xticklabels(get_xtick_labs_colored(xticklabs, short_names, epoch_colors))
-%     xtickangle(45)
+    xtickangle(45)
+    xticklabels(xticklabs)
+    xlim([0.5 0.5 + length(sessions_to_use)])
+    ylabel('Slope (degrees)')
+    ylim([39 52])
+    yticks(40:5:50)
+    set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+        'XMinorTick', 'off', 'YMinorTick', 'off', 'YGrid', 'on', ...
+        'fontsize', 26, ...
+        'fontname', 'Helvetica', 'fontweight', 'normal', ...
+        'XColor', 'black', 'YColor', 'black')
+    % legend({'Monkey R', 'Monkey X'}, 'Interpreter', 'none')
+    set(gcf, 'Color', 'w')
+end
+% sgtitle(sprintf('%s, slopes of major-axis regression, VR alpha %0.2f', area_to_plot, vr_alpha), 'Interpreter', 'none')
+% saveas(gcf, fullfile(figureSavePath, sprintf('VR_slopes_%s', m, sessn, slope_id)), 'epsc')
+
+%% Plot correlation of selected MARs
+
+vr_alpha = 0.05;
+alpha_string_scale_factor = 100;
+% test_intervals = {[175 350]};
+test_intervals = {[175 275]};
+area_to_plot = 'te';
+
+% make fig
+figure2('Position', [400 400 300 800]);
+hold on
+for m = 1:length(Monkeys)
+    subplot(2,1,m)
+    hold on
+    
+    sessions_to_use = Monkeys(m).Sessions_to_use;
+    baseline_i_vals = [];
+    
+    % get baseline/pre/post session inds
+    for i = 1:length(sessions_to_use)
+        sessn = sessions_to_use(i);
+        if ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post', 'once'))
+            post_i_val = i;
+        elseif ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre', 'once'))
+            pre_i_val = i;
+        elseif ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Base', 'once'))
+            baseline_i_vals = [baseline_i_vals i];
+        end
+    end
+    
+    for p = 1:length(test_intervals)
+        test_int = test_intervals{p};
+        rval_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_RValue_%s_Alpha%d', areas_to_plot{a}, vr_alpha*alpha_string_scale_factor));
+        
+        % pre allocate
+        rvals = zeros(1,length(sessions_to_use));
+        
+        % collect data
+        for i = 1:length(sessions_to_use)
+            sessn = sessions_to_use(i);
+            rvals(i) = Monkeys(m).Sessions(sessn).(rval_id);
+            if ~isempty(regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post', 'once'))
+                post_data = rvals(i);
+            end
+        end
+        
+        % plot data
+        plot(baseline_i_vals, rvals(baseline_i_vals), 'LineWidth', 2, ...
+            'DisplayName', sprintf('%s, %d to %d', Monkeys(m).Name, test_int(1), test_int(2)),...
+            'Color', matlab_colors(1,:))
+        errorbar([pre_i_val post_i_val], rvals([pre_i_val post_i_val]), diff(theta_bounds(:, [pre_i_val post_i_val]))/2, 'LineWidth', 2, ...
+            'DisplayName', sprintf('%s, %d to %d', Monkeys(m).Name, test_int(1), test_int(2)),...
+            'Color', matlab_colors(1,:))
+        
+        % stats testing
+        for i = 1:length(sessions_to_use)
+            sessn = sessions_to_use(i);
+            switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+                case {'Pre'}
+                    t = Monkeys(m).Sessions(sessn).(slope_id);
+                    test_bounds = t([1 3]);
+                    post_bounds = post_data([1 3]);
+                    % look for overlap in the confidence intervals.
+                    if isempty(intersect(round(test_bounds(1),1):0.1:round(test_bounds(2),1), round(post_bounds(1),1):0.1:round(post_bounds(2),1)))
+                        scatter(mean([pre_i_val post_i_val]), t(1)*1.075, '*k', 'HandleVisibility', 'off')
+                        plot([pre_i_val post_i_val], repelem(t(1)*1.05, 1, 2) , '-k', 'LineWidth', 2, 'HandleVisibility', 'off')
+                    end
+                case 'Post'
+                    % dont test against itself
+                    continue
+            end
+        end
+    end
+    
+    % format plot
+    xlabel('Session')
+    xticks(1:length(sessions_to_use))
+    xticklabs = Monkeys(m).XTickLabs;
+%     xticklabels(get_xtick_labs_colored(xticklabs, short_names, epoch_colors))
+    xtickangle(45)
     xticklabels(xticklabs)
     xlim([0.5 0.5 + length(sessions_to_use)])
     ylabel('Slope (degrees)')
@@ -419,7 +659,7 @@ end
 function formatPlot(ax, fig)
 set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
     'XMinorTick', 'off', 'YMinorTick', 'off',...
-    'fontsize',40, 'YGrid', 'on', 'XGrid', 'on',...
+    'fontsize',20, 'YGrid', 'on', 'XGrid', 'on',...
     'fontname', 'Helvetica',...
     'XColor', 'black', 'YColor', 'black')
 set(fig, 'Color', 'white')

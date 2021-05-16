@@ -37,21 +37,21 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 
 % SVM Parameters
 random_seed = 10; % for reproducibility 
-rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
-% rArrayLocs = {'te'};
-% rSessionsByMonk = {[7 9], [6 7]};
-rSessionsByMonk = {1:9, 1:7};
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
+rArrayLocs = {'te'};
+rSessionsByMonk = {[7 9], [6 7]};
+% rSessionsByMonk = {1:9, 1:7};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
-runShuffle = false; % run the shuffled condition?
-    nShuffles = 100;
-matchInputSizes = false; % make input matrices all same size (control) ?
+runShuffle = true; % run the shuffled condition?
+    nShuffles = 5;
+matchInputSizes = true; % make input matrices all same size (control) ?
     % These parameters only used if matching input sizes. If false, these
     % parameters are automatically set to NaN, NaN, and 1.
     proportion_of_min_pop_size = 0.75; 
     proportion_of_min_trials = 0.75;
-    nRandomSubsamples = 20;
+    nRandomSubsamples = 50;
 manuallyReduceIntervals = false; % test a subset of all the intervals for faster testing
-    manualIntervals = {[75 175] [175 275] [275 375]};
+    manualIntervals = {[175 275] [175 350]};
 kfold_num = 5; % k-fold cross validation. 
 % Note that folds are not generated purely randomly -- we impose
 % constraints about not re-using the same image in train vs test ("abstract
@@ -67,6 +67,8 @@ width = 100;
 spikeCountPath = 'XMA2/Spike_count_mats';
 TE_LOCS = {'anterior', 'middle', 'posterior'};
 catg2_ind1 = 261;
+fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % double %% escapes the first %s
+% fname_base = sprintf('%%s_allNeurons_variableBin_1.mat'); % contains 75-175, 175-225, 175-275, and 175-350.
 
 %% Create param struct for saving into record
 
@@ -168,7 +170,7 @@ for m = 1:length(Monkeys)
 
         % Get data from appropriate storage place
         MonkID = sprintf('%s_%s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName);
-        fileName = sprintf('%s_allNeurons_step%d_wd%d.mat', MonkID, step, width);
+        fileName = sprintf(fname_base, MonkID);
         [X_full, rIntervals] = load_interval_data(fullfile(EXT_HD, spikeCountPath, fileName)); % X is spike counts, rIntervals is list of each interval
         Y = Monkeys(m).Sessions(sessn).Session_Y_catg; % list of categories for each image in X (1 or 2)
         unitBools = Monkeys(m).Sessions(sessn).SVMBools; % cell array of boolean for units to use for each loc
@@ -305,7 +307,7 @@ Monkeys(m).RIntervals = rIntervals;
 fullSVMPath = fullfile(EXT_HD, pv_path, 'SVM_results_%g.mat');
 fullRecordPath = fullfile(EXT_HD, svmRecordPath);
 save_SVM_data(Monkeys, paramStruct, fullSVMPath, fullRecordPath);
-
+fprintf('Data saved.')
 
 %% Functions
 

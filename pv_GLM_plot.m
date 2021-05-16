@@ -42,7 +42,8 @@ end
 
 %% Find desired GLM data
 
-ID = 633648; % 75-175, 175-275, 275-375
+% ID = 633648; % 75-175, 175-275, 275-375
+ID = 748804; % all days, same 3 ints
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -69,18 +70,21 @@ clear data
 %% Choose what to plot
 
 % Choose sessions.
-rSessionsByMonk = {[7 9] [6 7]};
+% rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
+rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+% rSessionsByMonk = {[1 6 7 9], [1 5 6 7]};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-rArrayLocs = {'te'};
+% rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-% rArrayLocs = {'anterior', 'middle', 'posterior'}; 
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
 
 %% Plot "bars and stars" for a particular timepoint
 
-allYLims = [0.3 0.6];
+% allYLims = [0.3 0.6]; % te
+allYLims = [0.1 0.8]; % arrays
 singleInterval = [175 275];
 interval = singleInterval;
 glm_alpha = 0.05;
@@ -125,13 +129,30 @@ for m = 1:length(Monkeys)
         end
         
         % Plot the data
-        plot(1:length(rSessions), nSig ./ nTotal, 'o-', 'MarkerFaceColor', mlc(1))
+        % TE
+%         plot(1:length(rSessions), nSig ./ nTotal, 'o-', 'MarkerFaceColor', mlc(1))
+        plot(1:length(rSessions)-2, nSig(1:end-2) ./ nTotal(1:end-2),...
+            'o-', 'MarkerFaceColor', mlc(iLoc), 'Color', mlc(iLoc))
+        plot((length(rSessions)-1):length(rSessions), nSig(end-1:end) ./ nTotal(end-1:end),...
+            'o-', 'MarkerFaceColor', mlc(iLoc), 'Color', mlc(iLoc))
         
+        % Arrays
+%         plot(1:length(rSessions), nSig ./ nTotal, 'o-', ...
+%             'MarkerFaceColor', mlc(iLoc), 'Color', mlc(iLoc), ...
+%             'MarkerSize', 10)
+%         
         % Stats testing if only two sessions (pre and post)
         if numel(rSessions)==2 && prop_test([nSig(1) nSig(2)], [nTotal(1) nTotal(2)], false, glm_alpha)
-            yval = max(nSig ./ nTotal);
-            plot(1:length(rSessions), repelem(yval*1.02, 1, 2), 'k-')
-            scatter(1.5, yval*1.05, 'k*')
+            
+            % te
+%             yval = max(nSig ./ nTotal);
+%             plot(1:length(rSessions), repelem(yval*1.02, 1, 2), 'k-') %
+%             scatter(1.5, yval*1.05, 'k*') % te
+            
+            % arrays
+            yval = mean(nSig ./ nTotal);
+            scatter(1.5, yval*1.1, 50, mlc(iLoc), '*') % arrays
+            
             [h, pval, chistat, df] = prop_test([nSig(1) nSig(2)], [nTotal(1) nTotal(2)], false, glm_alpha);
             fprintf('%s, session %s vs %s, signf. incr. in glm signf units (p = %d, chisq %0.5f, df %d \n',...
                 Monkeys(m).Name,...
@@ -142,16 +163,21 @@ for m = 1:length(Monkeys)
         
         % Add labels
         ylabel({'Fraction units', 'with signf. diff.'})
-%         xticklabels({Data(m).Sessions(rSessions).ShortName})
-%         xtickangle(45)
-        xticklabels({'Pre', 'Post'})
         xticks(1:length(rSessions))
+        xticklabels({Data(m).Sessions(rSessions).ShortName})
+        xtickangle(45)
+%         xticklabels({'Pre', 'Post'})
+%         xticks(1:length(rSessions))
         
         xlim([0.5 0.5+length(rSessions)])
         % Make graphs have the same y-axes within each monkey
 %         ylim(mkYLims{m})
         ylim(allYLims)
-
+        yticks(0.2:0.2:0.8) % arrays
+        
+        % Legend
+        make_custom_patch_legend(mlc(1:length(rArrayLocs)), rArrayLocs, 'Location', 'eastoutside')
+        
         % Make the plot look nice
         formatGLMPlot(gca, gcf)
     end

@@ -32,11 +32,15 @@ cluster_alpha = 0.05;
 % ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
 % ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
 % ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
-% ID = 754886; % all locs, matching, no shuffle, all days, all ints.
+ID = 754886; % all locs, matching, no shuffle, all days, all ints.
     % This one isn't good for Max, b/c three of his baseline days have very
     % low trial counts, and it drags down the decoding accuracy for the
     % other four.
-ID = 93591; % all locs, no matching, no shuffle, all days, all ints.
+% ID = 93591; % all locs, no matching, no shuffle, all days, all ints. SUPP FIG 6!
+% ID = 467637; % Variable bin sizes! all locs, no matching, no shuffle, all days.
+% ID = 696349; % copy of above
+% ID = 983557; % Variable bin sizes as above but with matching.
+% ID = 428279; % just pre and post, te, matched.
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -76,6 +80,7 @@ end
 % Choose sessions.
 % rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
 rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+% rSessionsByMonk = {[1 6 7 9], [1 5 6 7]};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
@@ -83,6 +88,7 @@ rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
 rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+% rArrayLocs = {'anterior', 'middle', 'posterior'}; 
      
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
 
@@ -153,7 +159,8 @@ end
 plot_alpha = 0.4; % transparency of sem fill
 mkYLims = {[0.45 0.85], [0.45 0.65]};
 
-%     figure2('Position', [400 400 1000 600])
+% figure2('Position', [400 400 1000 600])
+% tiledlayout(length(Monkeys), length(rArrayLocs))
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     
@@ -164,14 +171,14 @@ for m = 1:length(Monkeys)
     % Prepare figure
     figure2('Position', [400 400 1000 600])
 %     subplot(2,1,m)
-    hold on
     
     for iLoc = 1:length(rArrayLocs)
         loc = rArrayLocs{iLoc};
         
         % New subplot for each array location
 %         subplot(2, ceil(length(rArrayLocs)/2), iLoc)
-%         hold on
+%         nexttile
+        hold on
 
         % Big TE with smaller arrays underneath
         if strcmp(loc, 'te')
@@ -227,11 +234,11 @@ for m = 1:length(Monkeys)
             if iLoc == 1
                 xlabel('Time from cue on (ms)')
                 ylabel('SVM accuracy')
-                legend('Location', 'eastoutside')
+%                 legend('Location', 'eastoutside')
             end
             
             % Make graphs have the same y-axes within each monkey
-            ylim(mkYLims{m})
+%             ylim(mkYLims{m})
             
             % Detailed labels if desired
             %             ylabel('SVM abcat accuracy (mean +/- SEM)')
@@ -250,17 +257,25 @@ for m = 1:length(Monkeys)
 %     saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%g', Monkeys(m).Name, sigID, ID)), 'epsc')
 end
 
+%% Make legend
+for m = 1:length(Monkeys)
+   figure
+   make_custom_patch_legend(mlc(1:8), {Data(m).Sessions(rSessionsByMonk{m}).ShortName})
+end
+
 %% Plot "bars and stars" for a particular timepoint
 
-mkYLims = {[0.45 0.85], [0.45 0.65]};
+% mkYLims = {[0.5 0.75], [0.49 0.56]};
 % allYlims = [0.48 0.82];
-% singleInterval = [275 375];
 singleInterval = [175 275];
+% singleInterval = [175 350];
 
 % Prepare figure
-figure2('Position', [2200 1300 250 630])
+% figure2('Position', [2200 1300 250 630])
+figure2('Position', [2200 1300 400 1200])
+% figure
 hold on
-    
+
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     
@@ -329,10 +344,10 @@ for m = 1:length(Monkeys)
 %         xticklabels({'Pre', 'Post'})
         xticks(1:length(rSessions))
         xlim([0.5 0.5+length(rSessions)])
-        legend
+%         legend
         
         % Make graphs have the same y-axes within each monkey
-        ylim(mkYLims{m})
+%         ylim(mkYLims{m})
 %         ylim(allYlims)
 
         % Make the plot look nice
@@ -346,7 +361,6 @@ end
 
 %% Prep data for bar plot below
 
-saveDir = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/XMA2/SVM bins data';
 
 intervals_to_use = {[175 225], [175 275], [175 350]};
 sessions_to_compare_byMonk = {[1 6], [7 9]; [1 5], [6 7]}; % (monk) x (base or test)
@@ -354,6 +368,8 @@ rArrayLocs = {'te', 'anterior', 'middle', 'posterior'};
 
 % Each bin size should be a row of data. 
 % Cols: Loc1_base, loc1_test, loc2_base, loc2_test, etc.
+all_data = cell(2,1);
+
 for m = 1:length(Data)
     baseSessns = sessions_to_compare_byMonk{m,1};
     testSessns = sessions_to_compare_byMonk{m,2};
@@ -380,17 +396,27 @@ for m = 1:length(Data)
             test2_kfls = test2_kfls (:);
             
             % Store
-            data(iInt, iLoc*2 - 1) = mean(1 - base1_kfls) - mean(1 - base2_kfls);
-            data(iInt, iLoc*2) = mean(1 - test1_kfls) - mean(1 - test2_kfls);
+            data(iInt, iLoc*2 - 1) = mean(1 - base2_kfls) - mean(1 - base1_kfls);
+            data(iInt, iLoc*2) = mean(1 - test2_kfls) - mean(1 - test1_kfls);
         end
     end
+    all_data{m} = data;
+    
 end
 
 %% Bar plot of changes as function of bin size
 
-figure
-pairedbar(data, [], 0.8)
-
+for m = 1:length(Data)
+    data = all_data{m};
+    figure
+    pairedbar(data, [], 0.8)
+    
+    ylabel('Change in SVM accuracy')
+    xlabel('Bin size')
+    xticklabels({cellfun(@(int) int(2) - int(1), intervals_to_use)})
+    make_custom_patch_legend(mlc(1:4), rArrayLocs)
+    formatSVMPlot(gca, gcf)
+end
 
 %% Functions
 
@@ -417,6 +443,7 @@ function pairedbar(data, group_cols, lightenBy)
     
     for iGroup = 1:size(data,2)/2
         b(iGroup*2 - 1).FaceColor = lightenBy + (1-lightenBy)*group_cols(iGroup, :);
+        b(iGroup*2 - 1).LineStyle = '--';
         b(iGroup*2).FaceColor = group_cols(iGroup, :);
         b(iGroup*2 - 1).EdgeColor = group_cols(iGroup, :);
         b(iGroup*2).EdgeColor = group_cols(iGroup, :);

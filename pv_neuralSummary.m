@@ -129,7 +129,7 @@ end
 catgs = {1:260, 261:520};
 
 % intervals_to_test = {[-150 -50], [75 175], [175 275], [275 375]}; % time window from cue on
-intervals_to_test = {[-175 0], [-150 -50], [175 350], [75 175]};
+intervals_to_test = {[-175 0], [-150 -50], [175 350], [75 175], [175 275]};
 for m = 1:length(Monkeys)
     sessions_to_use = 1:length(Monkeys(m).Sessions);
         
@@ -195,8 +195,8 @@ end
 
 % test_intervals = {[75 175], [175 275], [275 375], [75 375]};
 % baseline_intervals = {[-150 -50], [-150 -50], [-150 -50], [-250 50]};
-test_intervals = {[75 175], [175 350]};
-baseline_intervals = {[-150 -50], [-175 0]};
+% test_intervals = {[75 175], [175 350], [175 275]};
+% baseline_intervals = {[-150 -50], [-175 0], [-150 -50]};
 
 
 by = 'all'; % other option is by image
@@ -280,10 +280,12 @@ end
 
 %% Bar plot of unit array / amount across days
 
-test_interval = {[75 175]};
-baseline_interval = {[-150 -50]};
-% test_interval = {[175 350]};
-% baseline_interval = {[-175 0]};
+% test_interval = {[75 175]};
+% baseline_interval = {[-150 -50]};
+test_interval = {[175 350]};
+baseline_interval = {[-175 0]};
+% test_interval = {[175 275]};
+% baseline_interval = {[-150 -50]};
 tid = get_good_interval_name2(test_int, 'full', 'VisResp_all_test');
 bid = get_good_interval_name2(baseline_int, '', '');
 vrID = strcat(tid,bid);
