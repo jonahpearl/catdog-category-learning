@@ -84,13 +84,17 @@ for m = 1:length(Monkeys)
         Y = Monkeys(m).Sessions(sessn).Session_Y_catg; % list of categories for each image in X (1 or 2)
         
         % Manually reduce intervals tested
+        warning('Reducing intervals tested...comment out these lines to run all intervals')
         rIntervals_original = rIntervals; % for finding idx in 3rd dim of X_full
         rIntervals = {[75 175], [175 275], [275 375]}; % for controlling loops
         
-        % Pre-allocate the storage vector
+        % Pre-allocate the storage vectors
         pVals = zeros(size(X_full,2), length(rIntervals));
+        coeffs = zeros(size(X_full,2), length(rIntervals));
+        
         if runShuffle
             pVals_SHUFFLE = zeros(size(X_full,2), length(rIntervals), nShuffles);
+            coeffs_SHUFF = zeros(size(X_full,2), length(rIntervals));
         end
                 
         for iUnit = 1:size(X_full,2)
@@ -111,26 +115,32 @@ for m = 1:length(Monkeys)
                 t = table(X_full(:, iUnit, idx), Y);
                 glm = fitglm(t, 'Var1 ~ Y', 'Distribution', 'poisson');
                 pVals(iUnit, iInt) = glm.Coefficients{2,4}; % 2,4 is ind for pval of slope
+                coeffs(iUnit, iInt) = glm.Coefficients{2,1}; % estimate of slope
                 
                 % Run with shuffled values if requested
                 if runShuffle
                     for iShuff = 1:nShuffles
                         t = table(X_full(:, iUnit), Y(randperm(length(Y))));
                         glm = fitglm(t, 'SC ~ catg', 'Distribution', 'poisson');
-                        pVals_SHUFFLE(iUnit, iInt, iShuff) = glm.Coefficients;
+                        pVals_SHUFFLE(iUnit, iInt, iShuff) = glm.Coefficients{2,4};
+                        coeffs(iUnit, iInt, iShuff) = glm.Coefficients{2,1}; % estimate of slope
                     end
                 end
             end
+            
             % Report progress.
             fprintf('Done with %s unit # %d session %d \n', Monkeys(m).Name, iUnit, sessn)
         end 
         
         % Store data.
         Monkeys(m).Sessions(sessn).GLM_Pvals = pVals;
+        Monkeys(m).Sessions(sessn).GLM_coeffs = coeffs;
         Monkeys(m).Sessions(sessn).GLM_intervals = rIntervals;
+        
         
         if runShuffle
             Monkeys(m).Sessions(sessn).GLM_Pvals_SHUFFLE = pVals_SHUFFLE;
+            Monkeys(m).Sessions(sessn).GLM_coeffs_SHUFFLE = coeffs_SHUFFLE;
         end
 
     end
@@ -147,4 +157,4 @@ end
 fullGLMPath = fullfile(EXT_HD, pv_path, 'GLM_results_%g.mat');
 fullRecordPath = fullfile(EXT_HD, glmRecordPath);
 save_SVM_data(Monkeys, paramStruct, fullGLMPath, fullRecordPath);
-
+fprintf('File saved \n')
