@@ -42,8 +42,10 @@ cluster_alpha = 0.05;
 % ID = 983557; % Variable bin sizes as above but with matching.
 % ID = 428279; % just pre and post, te, matched.
 
-ID = 263440; % image subset analysis: train and test on 240/240
-
+% ID = 178096; % image subset analysis: train and test on 240/240, just te
+% ID = 977195; % image subset analysis: train and test on 240/240, all locs / days
+% ID = 772151; % image subset analysis: train on 240, test on 20, all locs / days
+ID = 339824; % image subset analysis: train on 20, test on 240, all locs / days
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -83,16 +85,16 @@ end
 %% Choose what to plot
 
 % Choose sessions.
-rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
-% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+% rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
+rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 % rSessionsByMonk = {[1 6 7 9], [1 5 6 7]};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-rArrayLocs = {'te'};
+% rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
 % rArrayLocs = {'anterior', 'middle', 'posterior'}; 
      
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
@@ -271,13 +273,15 @@ end
 %% Plot "bars and stars" for a particular timepoint
 
 % mkYLims = {[0.5 0.75], [0.49 0.56]};
+mkYLims = {[0.5 0.75], [0.5 0.6]};
 % allYlims = [0.48 0.82];
 singleInterval = [175 275];
 % singleInterval = [175 350];
 
 % Prepare figure
 % figure2('Position', [2200 1300 250 630])
-figure2('Position', [2200 1300 400 1200])
+% figure2('Position', [2200 1300 400 1200])
+figure2('Position', [2200 1300 0.75*600 0.75*1200])
 % figure
 hold on
 
@@ -352,7 +356,7 @@ for m = 1:length(Monkeys)
 %         legend
         
         % Make graphs have the same y-axes within each monkey
-%         ylim(mkYLims{m})
+        ylim(mkYLims{m})
 %         ylim(allYlims)
 
         % Make the plot look nice

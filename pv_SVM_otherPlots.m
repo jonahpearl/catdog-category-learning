@@ -43,6 +43,11 @@ ID = 93591; % all locs, no matching, no shuffle, all days, all ints. SUPP FIG 6!
 % ID = 983557; % Variable bin sizes as above but with matching.
 % ID = 428279; % just pre and post, te, matched.
 
+% ID = 178096; % image subset analysis: train and test on 240/240, just te
+ID = 977195; % image subset analysis: train and test on 240/240, all locs / days
+% ID = 772151; % image subset analysis: train on 240, test on 20, all locs / days
+% ID = 339824; % image subset analysis: train on 20, test on 240, all locs / days
+
 fNames = fields(Record);
 row = find([Record.ID] == ID);
 for f = 1:length(fNames)
@@ -64,6 +69,8 @@ end
 load(sprintf(fullSVMPath, ID), 'data');
 Data = data;
 clear data
+
+%% Image subset analyses
 
 %% Familiarity comparisons
 

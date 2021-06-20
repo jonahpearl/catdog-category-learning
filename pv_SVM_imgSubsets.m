@@ -39,13 +39,13 @@ abcat since the trial nums are tiny.
 % "train" --> 20/20 set. "test" --> 240/240 set.
 img_sets = {[1:20 261:280], [21:260 281:520]}; 
 img_set_names = {'train', 'test'};
-svm_train_set_idx = 2; % 1 for train, 2 for test
+svm_train_set_idx = 1; % 1 for 20/20 training set, 2 for 240/240 testing set
 svm_test_set_idx = 2;
 
 % SVM Parameters
 random_seed = 10; % for reproducibility 
-% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
-rArrayLocs = {'te'};
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
+% rArrayLocs = {'te'};
 % rSessionsByMonk = {[7 9], [6 7]};
 rSessionsByMonk = {1:9, 1:7};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
@@ -58,7 +58,7 @@ matchInputSizes = false; % make input matrices all same size (control) ?
     proportion_of_min_trials = 0.75;
     nRandomSubsamples = 50;
 manuallyReduceIntervals = true; % test a subset of all the intervals for faster testing
-    manualIntervals = {[175 275]};
+    manualIntervals = {[175 275], [175 350]}; % NB, also need to change variable fname_base to grab file containing desired intervals
 kfold_num = 5; % k-fold cross validation. 
 % Note that folds are not generated purely randomly -- we impose
 % constraints about not re-using the same image in train vs test ("abstract
@@ -75,8 +75,8 @@ spikeCountPath = 'XMA2/Spike_count_mats';
 TE_LOCS = {'anterior', 'middle', 'posterior'};
 catg2_ind1 = 261;
 
-fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % double %% escapes the first %s
-% fname_base = sprintf('%%s_allNeurons_variableBin_1.mat'); % contains 75-175, 175-225, 175-275, and 175-350.
+% fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % double %% escapes the first %s
+fname_base = sprintf('%%s_allNeurons_variableBin_1.mat'); % contains 75-175, 175-225, 175-275, and 175-350.
 
 %% Create param struct for saving into record
 
@@ -241,28 +241,11 @@ for m = 1:length(Monkeys)
                         Y_subset = Y(trial_idx); % ground truth category for those trials
                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID(trial_idx); % image IDs for those trials
                     else
-
                         X_subset = X(:,:, int_idx);
                         Y_subset = Y;
                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID;
-                        
-                        % IMGSUBSET edit
-                        % whoops actually don't want to do it like this
-                        % Get trials with the correct images for the
-                        % requested analysis.
-%                         imgID_Subset = Monkeys(m).Sessions(sessn).Session_Y_imageID; % on each trial, what image was shown?
-%                         svm_train_bool = ismember(imgID_Subset, img_sets{svm_train_set_idx}); % on each trial, should we use this data for the SVM?
-%                         svm_test_bool = ismember(imgID_Subset, img_sets{svm_test_set_idx});
                     end
                     
-%                     % IMGSUBSET edit
-                      % whoops actually don't want to do it like this
-%                     % Break up data into training and testing sets
-%                     X_subset_svm_train = X(svm_train_bool,:, int_idx);
-%                     Y_subset_svm_train = Y(svm_train_bool);
-%                     X_subset_svm_test = X(svm_test_bool,:, int_idx);
-%                     Y_subset_svm_test = Y(svm_test_bool);
-                        
                     % IMGSUBSET edit
                     % if we're training and testing on the same img set,
                     % run cross validation as normal.
@@ -314,6 +297,29 @@ for m = 1:length(Monkeys)
                                 end
                             end
 
+                            % Iterate.
+                            iK = iK+1;
+                        end
+                        
+                    elseif svm_train_set_idx ~= svm_test_set_idx
+                        % IMGSUBSETS edit
+                        % Which trials to use as training and testing, based
+                        % on the design of this analysis.
+                        svm_train_bool = ismember(imgID_Subset, img_sets{svm_train_set_idx}); % on each trial, should we use this data for the SVM?
+                        svm_test_bool = ismember(imgID_Subset, img_sets{svm_test_set_idx});
+                        
+                        % Here, our training and test data matrices are
+                        % different by design, so we can't really
+                        % cross-validate per se. We'll just run the full
+                        % model kfold_num times in order to generate some
+                        % error bars wrt the random seed.
+                        for k = 1:kfold_num 
+                            % Run the model.
+                            model = fitclinear(X_subset(svm_train_bool,:), Y_subset(svm_train_bool),'Regularization', 'lasso');
+                            % Get prediction error.
+                            preds = predict(model, X_subset(svm_test_bool,:));
+                            err = sum(preds ~= Y_subset(svm_test_bool)) / sum(svm_test_bool);
+                            kflValues(iK) = err;
                             % Iterate.
                             iK = iK+1;
                         end
