@@ -1,4 +1,4 @@
-function s = sparseness(spike_counts)
+function s = calculate_sparseness(spike_counts)
 % s = SPARSENESS(spike_counts)
 % Calculates sparseness of a vector of positive integers 
 % (baseline-normalized spike counts) following Vogels 1999.
