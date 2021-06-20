@@ -8,7 +8,8 @@ function save_SVM_data(data, paramStruct, svmPath, recordMatPath)
 load(recordMatPath, 'Record');
 
 % Get all field names.
-fields = fieldnames(Record);
+fields = fieldnames(paramStruct);
+fields = [fields 'ID'];
 
 % Check if this set of parameters already exists
 % for i = 1:length(Record)

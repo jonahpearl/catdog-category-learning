@@ -32,7 +32,7 @@ cluster_alpha = 0.05;
 % ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
 % ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
 % ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
-ID = 754886; % all locs, matching, no shuffle, all days, all ints.
+% ID = 754886; % all locs, matching, no shuffle, all days, all ints.
     % This one isn't good for Max, b/c three of his baseline days have very
     % low trial counts, and it drags down the decoding accuracy for the
     % other four.
@@ -41,6 +41,9 @@ ID = 754886; % all locs, matching, no shuffle, all days, all ints.
 % ID = 696349; % copy of above
 % ID = 983557; % Variable bin sizes as above but with matching.
 % ID = 428279; % just pre and post, te, matched.
+
+ID = 263440; % image subset analysis: train and test on 240/240
+
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -51,6 +54,8 @@ for f = 1:length(fNames)
         fprintf('%s: %s \n', field, mat2str(s))
     elseif strcmp(field, 'SessionsUsed')
         fprintf('%s: %s--%s, %s--%s \n', field, Monkeys(1).Name, mat2str(s{1}), Monkeys(2).Name, mat2str(s{2}))
+    elseif strcmp(field, 'IntervalsUsed')
+        continue
     elseif isa(s, 'cell')
         fprintf('%s: %s \n', field, join(cellfun(@string ,s), ', '))
     else
@@ -78,16 +83,16 @@ end
 %% Choose what to plot
 
 % Choose sessions.
-% rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
-rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 % rSessionsByMonk = {[1 6 7 9], [1 5 6 7]};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-% rArrayLocs = {'te'};
+rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
 % rArrayLocs = {'anterior', 'middle', 'posterior'}; 
      
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)

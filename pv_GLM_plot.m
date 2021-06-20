@@ -190,6 +190,87 @@ end
 % pause(0.5)
 % saveas(gcf, fullfile(figureSavePath, sprintf('GLM_%g_%s_%d_to_%d', ID, loc, interval(1), interval(2))), 'epsc')
 
+%% Familiarity comparisons
+
+% mkYLims = {[0.5 0.75], [0.49 0.56]};
+% allYlims = [0.48 0.82];
+singleInterval = [175 275];
+interval = singleInterval;
+% singleInterval = [175 350];
+
+% Prepare figure
+% figure2('Position', [2200 1300 250 630])
+figure2('Position', [2200 1300 400 1200])
+% figure
+hold on
+
+rSessionsByMonk = {[1 6 7 9], [1 5 6 7]}; % [baseFirst, baseLast, pre, post]
+rArrayLocs = {'te', 'anterior', 'middle', 'posterior'};
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+        
+    % New subplot for each monkey
+    subplot(length(Monkeys), 1, m)
+    hold on
+        
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
+        
+        % Pre-allocate vectors (proportion = nSig/nTotal but collecting
+        % this way makes stats tests easier)
+        nSig = zeros(1, length(rSessions));
+        nTotal = zeros(1, length(rSessions));
+        
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            
+            % Get indices of units in the pValues matrix to use in calculating
+            % proprotion of units with signf GLMs
+            if strcmp(loc, 'te')
+                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Area}, loc);
+            else
+                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
+            end
+            
+            % Get interval to use
+            rIntervals = Data(m).Sessions(sessn).GLM_intervals;
+            idx = find(cellfun(@(a) all(a == interval), rIntervals));
+            
+            pVals = Data(m).Sessions(sessn).GLM_Pvals;
+            nSig(i) = sum(pVals(units, idx) < glm_alpha);
+            nTotal(i) = sum(units);
+        end
+        
+        % Baseline days
+        plot([1 2], nSig([1 2]) ./ nTotal([1 2]),... 
+            'o-',...
+            'LineWidth', 2,...
+            'Color', mlc(iLoc),...
+            'DisplayName', loc)
+
+        % pre and post
+        plot([3 4], nSig([3 4]) ./ nTotal([3 4]),...
+            'o-',...
+            'LineWidth', 2,...
+            'Color', mlc(iLoc),...
+            'HandleVisibility', 'off')
+        
+        % Add labels
+        ylabel('Prop. signf. (GLM)')
+        xticks(1:length(rSessions))
+        xticklabels({Data(m).Sessions(rSessions).ShortName})
+        xtickangle(45)
+        xlim([0.5 0.5+length(rSessions)])
+%         legend
+        title('Familiarity comparisons')
+
+        % Make the plot look nice
+        formatGLMPlot(gca, gcf)
+    end
+end
+
+
 %% Histogram of GLM coeffs for signf units 
 
 singleInterval = [175 275];
@@ -287,7 +368,7 @@ for m = 1:length(Monkeys)
         pVals = Data(m).Sessions(sessn).GLM_Pvals;
         signf_bools = (pVals(:, idx) < glm_alpha) & units';
         signf_coeffs = Data(m).Sessions(sessn).GLM_coeffs(signf_bools);
-        fprintf('%s, sessn %d, signf. GLM coeffs in %s (ABSOLUTE VALUE, exp''d): mean %0.2f, std %0.2f\n', ...
+        fprintf('%s, sessn %d, signf. GLM coeffs in %s — mean or std of (exp(abs(coeff))): mean %0.2f, std %0.2f\n', ...
             Monkeys(m).Name, sessn, loc, mean(exp(abs(signf_coeffs))), std(exp(abs(signf_coeffs))))
     end
 end

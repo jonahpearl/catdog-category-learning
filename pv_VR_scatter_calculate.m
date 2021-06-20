@@ -194,7 +194,7 @@ for m = 1:length(Monkeys)
                 
                 % Test each unit on those trials
                 for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
-                    [~,img_vr_mat(p,j)] = ttest2(baselineSC(idx,j), testSC(idx,j), 'tail', 'left'); 
+                    [~,img_vr_mat(p,j)] = ttest(baselineSC(idx,j), testSC(idx,j), 'tail', 'left'); 
                     
                     % Old way of non-parametric testing
 %                     img_vr_mat(p,j) = signrank(baselineSC(idx,j), testSC(idx,j), 'tail', 'left'); % tests that median(baseline-test) < 0
@@ -210,7 +210,8 @@ for m = 1:length(Monkeys)
 end
 
 %% Save data
-fname = 'MaxMarta_VR_img_TTest_v2.mat'; % v2 has 175-275
+% fname = 'MaxMarta_VR_img_TTest_v2.mat'; % v2 has 175-275
+fname = 'MaxMarta_VR_img_TTest_jun2021.mat'; % changed ttest2 to ttest (because they're paired!)
 t = whos('Monkeys');
 if t.bytes > 2e9 % split large struct and save all the vars
     [status, vnames] = split_monkeyStruct_in_parts(Monkeys);
