@@ -1,3 +1,4 @@
+
 % SVMs on different image subsets
 
 %% Load data
@@ -40,7 +41,7 @@ abcat since the trial nums are tiny.
 img_sets = {[1:20 261:280], [21:260 281:520]}; 
 img_set_names = {'train', 'test'};
 svm_train_set_idx = 1; % 1 for 20/20 training set, 2 for 240/240 testing set
-svm_test_set_idx = 2;
+svm_test_set_idx = 1;
 
 % SVM Parameters
 random_seed = 10; % for reproducibility 
