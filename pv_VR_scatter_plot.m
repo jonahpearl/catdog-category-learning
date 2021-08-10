@@ -194,13 +194,8 @@ interval_to_plot = [175 275];
 vr_alpha = 0.05;
 alpha_string_scale_factor = 100;
 area_to_plot = 'te';
-color_by_waveform_class = false;
-colors = cbrewer('qual', 'Set1', 5);
 f1 = figure('Position', [400 400 860 800]); % scatter plots
-hold on
 f2 = figure('Position', [400 400 400 800]); % histograms
-f3 = figure('Position', [400 400 400 800]); % sums
-
 hold on
 
 for m = 1:length(Monkeys)
@@ -262,7 +257,7 @@ for m = 1:length(Monkeys)
         subplot(length(Monkeys),length(sessions_to_use),...
             length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
         hold on
-        scatter(dog_props, cat_props, 'bo')
+        scatter(dog_props, cat_props, 70,'bo')
 %         binscatter(dog_props, cat_props, 20)
 %         scatterDiagHist(dog_props, cat_props, -0.2:0.025:0.2, 'bo')
         if i == 1 && m == 1
@@ -274,7 +269,7 @@ for m = 1:length(Monkeys)
         xticks([0 0.5 1])
         yticks([0 0.5 1])
 %         title(sprintf('%s', Monkeys(m).Sessions(sessn).ShortName), 'FontWeight', 'normal')
-        title(Monkeys(m).XTickLabs{i},'FontWeight', 'normal')
+%         title(Monkeys(m).XTickLabs{i},'FontWeight', 'normal')
         formatPlot(gca, f1)
         axis square
         
@@ -289,26 +284,29 @@ for m = 1:length(Monkeys)
         plot(xvals, xvals, 'k--', 'LineWidth', 2)
         plot(xvals, intercept + xvals*slope, 'r--', 'LineWidth', 2)
         
-        
-        
-        % Make histograms to add to diag of scatters
+        % Make histograms to visualize stats
         set(0, 'CurrentFigure', f2)
-%         subplot(length(Monkeys),length(sessions_to_use),...
-%             length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
         subplot(length(Monkeys), 1, m)
         hold on
-        histogram(abs(dog_props - cat_props), 'BinEdges', 0:0.025:0.3)
         xlabel('Selectivity |cat-dog|')
-%         histogram(perpendicular_resids, 'BinEdges', 0:0.025:0.2)
-        ax = gca;
-        formatPlot(ax, f2)
-        ax.YAxis.Visible = 'off';
-        ax.YGrid = 'off';
-        ax.XGrid = 'off';
-%         ax.XLabel.FontSize = 40;
-        ax.YAxis.Scale = 'log';
-        
+        ylabel('Probability')
+        histogram(abs(dog_props - cat_props), ...
+                'Normalization', 'probability',...
+                'BinEdges', 0:0.025:0.2,...
+                'FaceColor', mlc(i))
+        xl = get(gca,'xlim');
+        xlim([-0.02 xl(2)])
+        set(gca, 'FontSize', 20);
+%         ax = gca;
+%         ax.YAxis.Scale = 'log';  % for insets?
+        mu = mean(abs(dog_props - cat_props));
+        sigma = std(abs(dog_props - cat_props));
+%         sem = std(abs(dog_props - cat_props)) / sqrt(length(dog_props));
+        scatter(mu, 0.8 + i/20, 100, mlc(i), 'v', 'filled', 'MarkerEdgeColor', 'k')
+        plot([mu-sigma mu+sigma], repelem(0.8 + i/20,2), '-', 'Color', mlc(i), 'LineWidth', 1.5)
 
+
+        
     end
     
 %     % Informative sgtitle if desired
@@ -322,8 +320,9 @@ for m = 1:length(Monkeys)
 %     [h,pval] = vartest2(pre_diffs, post_diffs);
 %     fprintf('DIFFS Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
 %             var(pre_diffs), var(post_diffs), h, pval)
+        
     [h,pval] = ttest2(abs(pre_diffs), abs(post_diffs));
-    fprintf('ABS DIFFS pre vs post ttest2: h = %d, pval = %0.2f \n', ...
+    fprintf('ABS DIFFS pre vs post ttest2: h = %d, pval = %0.3f \n', ...
             h, pval)
     fprintf('Mean+std ABS DIFF pre: %0.2g +/- %0.2g, post: %0.2g + %02.g \n', ...
         mean(abs(pre_diffs)), std(abs(pre_diffs)), mean(abs(post_diffs)), std(abs(post_diffs)))
@@ -339,17 +338,8 @@ for m = 1:length(Monkeys)
 %     fprintf('RESIDUALS Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
 %             var(resids{pre_diff_idx}), var(resids{post_diff_idx}), h, pval)
 
-    % plot sums
-%     set(0, 'CurrentFigure', f3)
-%     subplot(length(Monkeys), 1, m)
-%     hold on
-%     errorbar(1:length(sessions_to_use), cellfun(@mean, sums), cellfun(@std, sums)./cellfun(@length,sums))
-%     formatPlot(ax, f3)
-%     title('Sums of cat and dog responsiveness')
 end
 
-% saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
-% saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
 
 %% Draw each histogram separately
 
@@ -563,33 +553,33 @@ for m = 1:length(Monkeys)
         % plot data
         errorbar(baseline_i_vals, theta_means(baseline_i_vals), diff(theta_bounds(:,baseline_i_vals))/2, 'LineWidth', 2, ...
             'DisplayName', sprintf('%s, %d to %d', Monkeys(m).Name, test_int(1), test_int(2)),...
-            'Color', matlab_colors(1,:))
+            'Color', 'k')
         errorbar([pre_i_val post_i_val], theta_means([pre_i_val post_i_val]), diff(theta_bounds(:, [pre_i_val post_i_val]))/2, 'LineWidth', 2, ...
             'DisplayName', sprintf('%s, %d to %d', Monkeys(m).Name, test_int(1), test_int(2)),...
-            'Color', matlab_colors(1,:))
+            'Color', 'k')
         
         % stats testing
-        for i = 1:length(sessions_to_use)
-            sessn = sessions_to_use(i);
-            switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
-                case {'Pre'}
-                    t = Monkeys(m).Sessions(sessn).(slope_id);
-                    test_bounds = t([1 3]);
-                    post_bounds = post_data([1 3]);
-                    % look for overlap in the confidence intervals.
-                    if isempty(intersect(round(test_bounds(1),1):0.1:round(test_bounds(2),1), round(post_bounds(1),1):0.1:round(post_bounds(2),1)))
-                        scatter(mean([pre_i_val post_i_val]), t(1)*1.075, '*k', 'HandleVisibility', 'off')
-                        plot([pre_i_val post_i_val], repelem(t(1)*1.05, 1, 2) , '-k', 'LineWidth', 2, 'HandleVisibility', 'off')
-                    end
-                case 'Post'
-                    % dont test against itself
-                    continue
-            end
-        end
+%         for i = 1:length(sessions_to_use)
+%             sessn = sessions_to_use(i);
+%             switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+%                 case {'Pre'}
+%                     t = Monkeys(m).Sessions(sessn).(slope_id);
+%                     test_bounds = t([1 3]);
+%                     post_bounds = post_data([1 3]);
+%                     % look for overlap in the confidence intervals.
+%                     if isempty(intersect(round(test_bounds(1),1):0.1:round(test_bounds(2),1), round(post_bounds(1),1):0.1:round(post_bounds(2),1)))
+%                         scatter(mean([pre_i_val post_i_val]), t(1)*1.075, '*k', 'HandleVisibility', 'off')
+%                         plot([pre_i_val post_i_val], repelem(t(1)*1.05, 1, 2) , '-k', 'LineWidth', 2, 'HandleVisibility', 'off')
+%                     end
+%                 case 'Post'
+%                     % dont test against itself
+%                     continue
+%             end
+%         end
     end
     
     % format plot
-    xlabel('Session')
+%     xlabel('Session')
     xticks(1:length(sessions_to_use))
     xticklabs = Monkeys(m).XTickLabs;
 %     xticklabels(get_xtick_labs_colored(xticklabs, short_names, epoch_colors))
@@ -710,7 +700,7 @@ end
 function formatPlot(ax, fig)
 set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
     'XMinorTick', 'off', 'YMinorTick', 'off',...
-    'fontsize',20, 'YGrid', 'on', 'XGrid', 'on',...
+    'fontsize',30, 'YGrid', 'on', 'XGrid', 'on',...
     'fontname', 'Helvetica',...
     'XColor', 'black', 'YColor', 'black')
 set(fig, 'Color', 'white')
