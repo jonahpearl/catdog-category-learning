@@ -15,6 +15,15 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 
 %% Set parameters
 
+% Model predictors
+include_trial_metadata = true; % include loc in trial and trial num in regression?
+if include_trial_metadata
+    numCoeffRows = 7; % in the model with trial metadata, relevant outputs are in rows 2-7
+else
+    numCoeffRows = NaN; % otherwise, it's just intercept and slope, and we want slope, ie row 2
+end
+
+
 % GLM Parameters
 random_seed = 10; % for reproducibility 
 % rSessionsByMonk = {[7 9], [6 7]};
@@ -32,12 +41,16 @@ width = 100;
 spikeCountPath = 'XMA2/Spike_count_mats';
 TE_LOCS = {'anterior', 'middle', 'posterior'};
 catg2_ind1 = 261;
+loc_in_trials_fname_base = '%s_imgLocInTrials.mat';
+trial_num_fname_base = '%s_trialNum.mat';
 
 %% Create param struct for saving into record
 
 paramStruct = struct('RandomSeed', random_seed, ...
-    'IgnoreVal', ignoreVal, 'RunShuffle', runShuffle, ...
-    'SessionsUsed', {rSessionsByMonk});
+    'IgnoreVal', ignoreVal,...
+    'RunShuffle', runShuffle, ...
+    'SessionsUsed', {rSessionsByMonk},...
+    'IncludeTrialMetadata', include_trial_metadata);
 
 %% Collect Session Y (image id and catg id)
 % very fast
@@ -77,11 +90,19 @@ for m = 1:length(Monkeys)
     for i = 1:length(rSessions)
         sessn = rSessions(i);
 
-        % Get data from appropriate storage place
+        % Get spike count data from appropriate storage place
         MonkID = sprintf('%s_%s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName);
         fileName = sprintf('%s_allNeurons_step%d_wd%d.mat', MonkID, step, width);
         [X_full, rIntervals] = load_interval_data(fullfile(EXT_HD, spikeCountPath, fileName)); % X is spike counts, rIntervals is list of each interval
         Y = Monkeys(m).Sessions(sessn).Session_Y_catg; % list of categories for each image in X (1 or 2)
+        
+        % Get other regressors we might use
+        fileName = sprintf(loc_in_trials_fname_base, MonkID);
+        loc_in_trial_mat = load(fullfile(EXT_HD, spikeCountPath, fileName), 'X');
+        loc_in_trial_mat = loc_in_trial_mat.X;
+        fileName = sprintf(trial_num_fname_base, MonkID);
+        trial_num_mat = load(fullfile(EXT_HD, spikeCountPath, fileName), 'X');
+        trial_num_mat = trial_num_mat.X;
         
         % Manually reduce intervals tested
         warning('Reducing intervals tested...comment out these lines to run all intervals')
@@ -89,10 +110,17 @@ for m = 1:length(Monkeys)
         rIntervals = {[75 175], [175 275], [275 375]}; % for controlling loops
         
         % Pre-allocate the storage vectors
-        pVals = zeros(size(X_full,2), length(rIntervals));
-        coeffs = zeros(size(X_full,2), length(rIntervals));
+        if include_trial_metadata
+            pVals = zeros(size(X_full,2), length(rIntervals), numCoeffRows);
+            coeffs = zeros(size(X_full,2), length(rIntervals), numCoeffRows);
+        else
+            pVals = zeros(size(X_full,2), length(rIntervals));
+            coeffs = zeros(size(X_full,2), length(rIntervals));
+        end
         
-        if runShuffle
+        if runShuffle && include_trial_metadata
+            error('shuffle not implemented for trial metadata yet')
+        elseif runShuffle
             pVals_SHUFFLE = zeros(size(X_full,2), length(rIntervals), nShuffles);
             coeffs_SHUFF = zeros(size(X_full,2), length(rIntervals));
         end
@@ -112,10 +140,21 @@ for m = 1:length(Monkeys)
             for iInt = 1:length(rIntervals)
                 interval = rIntervals{iInt};
                 idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
-                t = table(X_full(:, iUnit, idx), Y);
-                glm = fitglm(t, 'Var1 ~ Y', 'Distribution', 'poisson');
-                pVals(iUnit, iInt) = glm.Coefficients{2,4}; % 2,4 is ind for pval of slope
-                coeffs(iUnit, iInt) = glm.Coefficients{2,1}; % estimate of slope
+                
+                if include_trial_metadata
+                    t = table(X_full(:, iUnit, idx), loc_in_trial_mat, trial_num_mat, Y,...
+                        'VariableNames', {'spikeCount', 'locInTrial', 'trialNum', 'imgCatg'});
+                    formula = 'spikeCount ~ locInTrial * trialNum * imgCatg - locInTrial:trialNum:imgCatg';
+                    glm = fitglm(t, formula, 'Distribution', 'poisson');
+                    pVals(iUnit, iInt, :) = glm.Coefficients{:,4}; % 4th col is pval
+                    coeffs(iUnit, iInt, :) = glm.Coefficients{:,1}; % 1st col is estimate
+                else
+                    t = table(X_full(:, iUnit, idx), Y, ....
+                        'VariableNames', {'spikeCount', 'imgCatg'});
+                    glm = fitglm(t, 'spikeCount ~ imgCatg', 'Distribution', 'poisson');
+                    pVals(iUnit, iInt) = glm.Coefficients{2,4}; % 2,4 is ind for pval of slope
+                    coeffs(iUnit, iInt) = glm.Coefficients{2,1}; % estimate of slope
+                end
                 
                 % Run with shuffled values if requested
                 if runShuffle

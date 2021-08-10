@@ -77,16 +77,16 @@ rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-% rArrayLocs = {'te'};
+rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
-rArrayLocs = {'anterior', 'middle', 'posterior'}; 
+% rArrayLocs = {'anterior', 'middle', 'posterior'}; 
 
 %% Plot "bars and stars" for a particular timepoint
 
-% allYLims = [0.3 0.6]; % te
-allYLims = [0.1 0.8]; % arrays
+allYLims = [0.3 0.6]; % te
+% allYLims = [0.1 0.8]; % arrays
 singleInterval = [175 275];
 interval = singleInterval;
 glm_alpha = 0.05;
@@ -133,11 +133,13 @@ for m = 1:length(Monkeys)
         
         % Plot the data
         % TE
+%         color = mlc(iLoc);
+        color = 'k';
 %         plot(1:length(rSessions), nSig ./ nTotal, 'o-', 'MarkerFaceColor', mlc(1))
         plot(1:length(rSessions)-2, nSig(1:end-2) ./ nTotal(1:end-2),...
-            'o-', 'MarkerFaceColor', mlc(iLoc), 'Color', mlc(iLoc))
+            'o-', 'MarkerFaceColor', color, 'Color', color)
         plot((length(rSessions)-1):length(rSessions), nSig(end-1:end) ./ nTotal(end-1:end),...
-            'o-', 'MarkerFaceColor', mlc(iLoc), 'Color', mlc(iLoc))
+            'o-', 'MarkerFaceColor', color, 'Color', color)
         
         % Arrays
 %         plot(1:length(rSessions), nSig ./ nTotal, 'o-', ...
@@ -148,13 +150,13 @@ for m = 1:length(Monkeys)
         if numel(rSessions)==2 && prop_test([nSig(1) nSig(2)], [nTotal(1) nTotal(2)], false, glm_alpha)
             
             % te
-%             yval = max(nSig ./ nTotal);
-%             plot(1:length(rSessions), repelem(yval*1.02, 1, 2), 'k-') %
-%             scatter(1.5, yval*1.05, 'k*') % te
+            yval = max(nSig ./ nTotal);
+            plot(1:length(rSessions), repelem(yval*1.02, 1, 2), 'k-') %
+            scatter(1.5, yval*1.05, 'k*') % te
             
             % arrays
-            yval = mean(nSig ./ nTotal);
-            scatter(1.5, yval*1.1, 50, mlc(iLoc), '*') % arrays
+%             yval = mean(nSig ./ nTotal);
+%             scatter(1.5, yval*1.1, 50, mlc(iLoc), '*') % arrays
             
             [h, pval, chistat, df] = prop_test([nSig(1) nSig(2)], [nTotal(1) nTotal(2)], false, glm_alpha);
             fprintf('%s, session %s vs %s, signf. incr. in glm signf units (p = %d, chisq %0.5f, df %d \n',...
@@ -179,7 +181,7 @@ for m = 1:length(Monkeys)
         yticks(0.2:0.2:0.8) % arrays
         
         % Legend
-        make_custom_patch_legend(mlc(1:length(rArrayLocs)), rArrayLocs, 'Location', 'eastoutside')
+%         make_custom_patch_legend(mlc(1:length(rArrayLocs)), rArrayLocs, 'Location', 'eastoutside')
         
         % Make the plot look nice
         formatGLMPlot(gca, gcf)
@@ -204,7 +206,7 @@ figure2('Position', [2200 1300 400 1200])
 % figure
 hold on
 
-rSessionsByMonk = {[1 6 7 9], [1 5 6 7]}; % [baseFirst, baseLast, pre, post]
+% rSessionsByMonk = {[1 6 7 9], [1 5 6 7]}; % [baseFirst, baseLast, pre, post]
 rArrayLocs = {'te', 'anterior', 'middle', 'posterior'};
 
 for m = 1:length(Monkeys)
@@ -262,7 +264,7 @@ for m = 1:length(Monkeys)
         xticklabels({Data(m).Sessions(rSessions).ShortName})
         xtickangle(45)
         xlim([0.5 0.5+length(rSessions)])
-%         legend
+        legend()
         title('Familiarity comparisons')
 
         % Make the plot look nice
@@ -270,18 +272,16 @@ for m = 1:length(Monkeys)
     end
 end
 
-
 %% Histogram of GLM coeffs for signf units 
 
 singleInterval = [175 275];
 interval = singleInterval;
 glm_alpha = 0.05;
 ranksum_alpha = 0.05;       
+rArrayLocs = {'te'};
 
 % Prepare figure
 figure2('Position', [1100 1000 250 630])
-hold on
-tiledlayout(2,3)
     
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -335,6 +335,7 @@ for m = 1:length(Monkeys)
         
         % Add labels
         ylabel('Probability')
+        xlabel('|GLM coefficients|')
         
         % Make the plot look nice
         formatGLMPlot(gca, gcf)

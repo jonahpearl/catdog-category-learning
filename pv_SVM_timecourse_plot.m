@@ -26,17 +26,23 @@ cluster_alpha = 0.05;
 
 % Note: need 100x shuffle for permutation testing.
 
-% ID = 570049; % te and the three individual arrays, matching at 75%, with shuffle.
+% XXX ID = 570049XXX; % (empty for some reason) te and the three individual arrays, matching at 75%, with shuffle.
 % ID = 844422; % copy of 570049 with unitinfo, cueinfo, etc.
+
 % ID = 439280; % te, no matching, with 5x shuffle.
 % ID = 958736; % te, no matching, with 100x shuffle. FIG 2!
 % ID = 317849; % anterior, middle, posterior, no matching, with 5x shuffle.
 % ID = 886768; % all locs, no matching, 5x shuffle, all days, three main intervals.
+
 % ID = 754886; % all locs, matching, no shuffle, all days, all ints.
+    % Supp Fig 4, accuracy across days!
     % This one isn't good for Max, b/c three of his baseline days have very
     % low trial counts, and it drags down the decoding accuracy for the
     % other four.
-% ID = 93591; % all locs, no matching, no shuffle, all days, all ints. SUPP FIG 6!
+    
+ID = 93591; % all locs, no matching, no shuffle, all days, all ints. Supp
+% fig 4, accuracy across time.
+
 % ID = 467637; % Variable bin sizes! all locs, no matching, no shuffle, all days.
 % ID = 696349; % copy of above
 % ID = 983557; % Variable bin sizes as above but with matching.
@@ -46,7 +52,7 @@ cluster_alpha = 0.05;
 % ID = 977195; % image subset analysis: train and test on 240/240, all locs / days
 % ID = 772151; % image subset analysis: train on 240, test on 20, all locs / days
 % ID = 339824; % image subset analysis: train on 20, test on 240, all locs / days
-ID = 436650; % image subset analysis: train on 20, test on 20, all locs / days
+% ID = 436650; % image subset analysis: train on 20, test on 20, all locs / days
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -274,8 +280,8 @@ end
 %% Plot "bars and stars" for a particular timepoint
 
 % mkYLims = {[0.5 0.75], [0.49 0.56]};
-mkYLims = {[0.5 0.75], [0.5 0.6]};
-% allYlims = [0.48 0.82];
+% mkYLims = {[0.5 0.75], [0.5 0.6]};
+allYlims = [0.48 0.82]; % Fig 2
 singleInterval = [175 275];
 % singleInterval = [175 350];
 
@@ -357,8 +363,8 @@ for m = 1:length(Monkeys)
 %         legend
         
         % Make graphs have the same y-axes within each monkey
-        ylim(mkYLims{m})
-%         ylim(allYlims)
+%         ylim(mkYLims{m})
+        ylim(allYlims)
 
         % Make the plot look nice
         formatSVMPlot(gca, gcf)

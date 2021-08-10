@@ -29,20 +29,20 @@ matlab_colors =  [0    0.4470    0.7410; % the matlab colors!
     0          0        0    ];
 for m = 1:length(Monkeys)
     if strcmp(Monkeys(m).Name, 'Marta_fix_cat_xma2')
-        Monkeys(m).Sessions_to_use = [1 2 3 5 6 7 9];
-        Monkeys(m).XTickLabs= {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
+%         Monkeys(m).Sessions_to_use = [1 2 3 5 6 7 9];
+%         Monkeys(m).XTickLabs= {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
 %         Monkeys(m).Sessions_to_use = [1 7 9];
 %         Monkeys(m).XTickLabs = {'Base 1', 'Pre', 'Post'};
-%         Monkeys(m).Sessions_to_use = [7 9];
-%         Monkeys(m).XTickLabs = {'Pre', 'Post'};
+        Monkeys(m).Sessions_to_use = [7 9];
+        Monkeys(m).XTickLabs = {'Pre', 'Post'};
         Monkeys(m).Code = 'R';
     elseif strcmp(Monkeys(m).Name, 'Max_fix_cat_xma2')
-        Monkeys(m).Sessions_to_use = [1 2 3 4 5 6 7];
-        Monkeys(m).XTickLabs = {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
+%         Monkeys(m).Sessions_to_use = [1 2 3 4 5 6 7];
+%         Monkeys(m).XTickLabs = {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
 %         Monkeys(m).Sessions_to_use = [1 6 7];
 %         Monkeys(m).XTickLabs = {'Base 1', 'Pre', 'Post'};
-%         Monkeys(m).Sessions_to_use = [6 7];
-%         Monkeys(m).XTickLabs = {'Pre', 'Post'};
+        Monkeys(m).Sessions_to_use = [6 7];
+        Monkeys(m).XTickLabs = {'Pre', 'Post'};
         Monkeys(m).Code = 'X';
     end
 end
@@ -193,7 +193,7 @@ end
 interval_to_plot = [175 275];
 vr_alpha = 0.05;
 alpha_string_scale_factor = 100;
-area_to_plot = 'posterior';
+area_to_plot = 'te';
 color_by_waveform_class = false;
 colors = cbrewer('qual', 'Set1', 5);
 f1 = figure('Position', [400 400 860 800]); % scatter plots
@@ -215,15 +215,29 @@ for m = 1:length(Monkeys)
         % Get data
         propn_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_CatDogPropns_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         t = Monkeys(m).Sessions(sessn).(propn_id);
+        
+        % Raw num of cat and dogs to which each neuron responds
         cat_props = t(1,:);
         dog_props = t(2,:);
+        
+        % Difference is like a selectivity measure
         diffs{i} = dog_props - cat_props;
+        
+        % Sum, to see if neurons respond to more images overall
         sums{i} = (dog_props + cat_props)*520;
+        
+        % Slope of fit line indicates population bias
         slope_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Slope_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         slope = tan(deg2rad(Monkeys(m).Sessions(sessn).(slope_id)(2)));
+        
+        % Intercept is ~meaningless, mostly 0
         intercept_id = get_good_interval_name2(interval_to_plot, 'full', sprintf('VisPropMAR_Intercept_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         intercept = Monkeys(m).Sessions(sessn).(intercept_id)(2);
         xvals = 0:0.01:1;
+        
+        % Residuals is similar to difference, since the fit lines are so
+        % close to 45 degrees. Reflects variance of neural responsiveness
+        % around its mean.
         resid_id = get_good_interval_name2(test_int, 'full', sprintf('VisPropMAR_Resids_%s_Alpha%d', area_to_plot, vr_alpha*alpha_string_scale_factor));
         perpendicular_resids = Monkeys(m).Sessions(sessn).(resid_id);
         resids{i} = perpendicular_resids;
@@ -248,8 +262,8 @@ for m = 1:length(Monkeys)
         subplot(length(Monkeys),length(sessions_to_use),...
             length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
         hold on
-%         scatter(dog_props, cat_props, 'bo')
-        binscatter(dog_props, cat_props, 20)
+        scatter(dog_props, cat_props, 'bo')
+%         binscatter(dog_props, cat_props, 20)
 %         scatterDiagHist(dog_props, cat_props, -0.2:0.025:0.2, 'bo')
         if i == 1 && m == 1
             xlabel('Fraction dogs causing exc.')
@@ -275,20 +289,25 @@ for m = 1:length(Monkeys)
         plot(xvals, xvals, 'k--', 'LineWidth', 2)
         plot(xvals, intercept + xvals*slope, 'r--', 'LineWidth', 2)
         
+        
+        
         % Make histograms to add to diag of scatters
         set(0, 'CurrentFigure', f2)
 %         subplot(length(Monkeys),length(sessions_to_use),...
 %             length(sessions_to_use)*(m-1) + mod(i-1, length(sessions_to_use)) + 1)
         subplot(length(Monkeys), 1, m)
         hold on
-%         histogram(dog_props - cat_props, 'BinEdges', -0.2:0.025:0.2)
-        histogram(perpendicular_resids, 'BinEdges', 0:0.025:0.2)
+        histogram(abs(dog_props - cat_props), 'BinEdges', 0:0.025:0.3)
+        xlabel('Selectivity |cat-dog|')
+%         histogram(perpendicular_resids, 'BinEdges', 0:0.025:0.2)
         ax = gca;
         formatPlot(ax, f2)
         ax.YAxis.Visible = 'off';
         ax.YGrid = 'off';
         ax.XGrid = 'off';
 %         ax.XLabel.FontSize = 40;
+        ax.YAxis.Scale = 'log';
+        
 
     end
     
@@ -300,9 +319,9 @@ for m = 1:length(Monkeys)
     pre_diffs = diffs{pre_diff_idx};
     post_diffs = diffs{post_diff_idx};
     
-    [h,pval] = vartest2(pre_diffs, post_diffs);
-    fprintf('DIFFS Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
-            var(pre_diffs), var(post_diffs), h, pval)
+%     [h,pval] = vartest2(pre_diffs, post_diffs);
+%     fprintf('DIFFS Pre var: %0.3g, post var: %0.3g. H = %d, p = %d \n', ...
+%             var(pre_diffs), var(post_diffs), h, pval)
     [h,pval] = ttest2(abs(pre_diffs), abs(post_diffs));
     fprintf('ABS DIFFS pre vs post ttest2: h = %d, pval = %0.2f \n', ...
             h, pval)
@@ -310,9 +329,9 @@ for m = 1:length(Monkeys)
         mean(abs(pre_diffs)), std(abs(pre_diffs)), mean(abs(post_diffs)), std(abs(post_diffs)))
         
     % Test sums (did units responsd to more images overall?)
-    [h,pval] = ttest2(sums{pre_diff_idx}, sums{post_diff_idx});
-    fprintf('SUMS, pre: %0.0f, post: %0.0f, pre vs post ttest2: h = %d, pval = %0.2f \n', ...
-            mean(sums{pre_diff_idx}), mean(sums{post_diff_idx}), h, pval)
+%     [h,pval] = ttest2(sums{pre_diff_idx}, sums{post_diff_idx});
+%     fprintf('SUMS, pre: %0.0f, post: %0.0f, pre vs post ttest2: h = %d, pval = %0.2f \n', ...
+%             mean(sums{pre_diff_idx}), mean(sums{post_diff_idx}), h, pval)
     
     
     % Ditto on residuals
@@ -321,11 +340,12 @@ for m = 1:length(Monkeys)
 %             var(resids{pre_diff_idx}), var(resids{post_diff_idx}), h, pval)
 
     % plot sums
-    set(0, 'CurrentFigure', f3)
-    subplot(length(Monkeys), 1, m)
-    hold on
-    errorbar(1:length(sessions_to_use), cellfun(@mean, sums), cellfun(@std, sums)./cellfun(@length,sums))
-    formatPlot(ax, f3)
+%     set(0, 'CurrentFigure', f3)
+%     subplot(length(Monkeys), 1, m)
+%     hold on
+%     errorbar(1:length(sessions_to_use), cellfun(@mean, sums), cellfun(@std, sums)./cellfun(@length,sums))
+%     formatPlot(ax, f3)
+%     title('Sums of cat and dog responsiveness')
 end
 
 % saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
@@ -354,7 +374,7 @@ for m = 1:length(Monkeys)
         ax.YAxis.Visible = 'off';
         ax.YGrid = 'off';
         ax.XGrid = 'off';
-%         saveas(gcf, fullfile(figureSavePath, sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
+        saveas(gcf, fullfile(figureSavePath, 'VR_hists', sprintf('VR_hist_m%d_sessn%d_%s', m, sessn, propn_id)), 'epsc')
     end
 end
 
