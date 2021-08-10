@@ -136,6 +136,7 @@ end
 unitIDs_post = {[1,7,6], [2,7,170], [2,7,284]}; 
 unitIDs_mid = {[1 7 112], [2,6,187], [1,9,105]}; 
 unitIDs_ant = {[1 7 80], [1 9 96], [2 7 12]}; % prefer [1 9 78] for extended here, but want one of Max's
+pct = 99;
 
 concat_unitIDs = {unitIDs_post unitIDs_mid unitIDs_ant};
 arrayNames = {'posterior', 'middle', 'anterior'};

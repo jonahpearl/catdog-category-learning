@@ -54,8 +54,9 @@ for m = 1:length(KDE)
 end
 
 %% Set sessions to use and xtick names and colors
-xtickcolors = cbrewer('qual', 'Dark2', 3);
-xtickcolors = xtickcolors([3 2 1], :);
+% xtickcolors = cbrewer('qual', 'Dark2', 3);
+% xtickcolors = xtickcolors([3 2 1], :);
+xtickcolors = [mlc(1:2); 0.5 0.5 0.5];
 for m = 1:length(KDE)
     if strcmp(KDE(m).Name, 'Marta_fix_cat_xma2')
 %         KDE(m).Sessions_to_use = [1 2 3 5 6 7 9];
@@ -146,6 +147,8 @@ save_path = fullfile(EXT_HD, 'XMA2/Monkey_structs/MaxMarta_KDEDiffs_HoldOneOut_r
 save(save_path, vnames{:}, 'bw', 'pct'); 
 
 %% (Optional) Load saved data
+clearvars
+close all
 EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
 CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 save_path = fullfile(EXT_HD, 'XMA2/Monkey_structs/MaxMarta_KDEDiffs_HoldOneOut_results.mat');
@@ -158,9 +161,10 @@ clear Data
 
 area_to_plot = 'te';
 boundary = 'static'; % static or dynamic
-nrows_insert = 3; % size of red line separating arrays
+nrows_insert = 3; % size of black line separating arrays
 sort_by = 'after_zero_latency'; % after_zero_latency or duration
 sort_empty_val = 1000; % controls if units with no signf diff go above or below others
+divider_color = [0.9 0.2 0.2 ];
 
 for m = 1:length(KDE)
     
@@ -297,14 +301,14 @@ for m = 1:length(KDE)
             unit_inds = find(strcmp(array_list, uq{j}));
             array_end_ind = max(unit_inds);
             ytick_spots(j) = round(median(unit_inds));
-%             ytick_labs{j} = sprintf('%s. (%d)', strcat(upper(uq{j}(1)), uq{j}(2:3)), numel(unit_inds));
+            ytick_labs{j} = sprintf('%s. (%d)', strcat(upper(uq{j}(1)), uq{j}(2:3)), numel(unit_inds));
         end
         
         % Set colormap:
         % 0,    0.5,    1
         % none  spacer  diff
         cm = parula(2);
-        cm = [cm(1,:); [1 0 0]; cm(2,:)];
+        cm = [cm(1,:); divider_color; cm(2,:)];
         colormap(cm);
         
         % Plot data
@@ -326,10 +330,10 @@ for m = 1:length(KDE)
             xlabel('Time from cue on (ms)')
             ylabel('Array (# units)')
         end
-%         xticks(0:200:700)
-%         xticklabels(-200:200:500)
-        xticks([0 400])
-        xticklabels([0 400])
+        xticks(0:200:700)
+        xticklabels(-200:200:500)
+%         xticks([0 400])
+%         xticklabels([0 400])
         ylim([0 max_yval])
         yticks(ytick_spots)
         yticklabels(ytick_labs)
@@ -354,8 +358,9 @@ boundary = 'static'; % static or dynamic
 % chi_sq_base_alpha = 0.05;
 % chi_sq_alpha = chi_sq_base_alpha / numel(chi_sq_inds);
 chi_sq_alpha = 0.05;
-colors = cbrewer('qual', 'Dark2', 3);
-colors = colors([3 2 1], :);
+% colors = cbrewer('qual', 'Dark2', 3);
+% colors = colors([3 2 1], :); % baseline, pre, post
+colors = [0.5 0.5 0.5; mlc(1:2)];
 range_normalize = false;
 
 % Pre allocate
