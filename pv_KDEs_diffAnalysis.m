@@ -146,7 +146,7 @@ save_path = fullfile(EXT_HD, 'XMA2/Monkey_structs/MaxMarta_KDEDiffs_HoldOneOut_r
 [status, vnames] = split_monkeyStruct_in_parts(KDE);
 save(save_path, vnames{:}, 'bw', 'pct'); 
 
-%% (Optional) Load saved data
+%% (Optional) Load saved data (then run "Set sessions..." above before analyzing)
 clearvars
 close all
 EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
@@ -810,13 +810,12 @@ for a = 1:length(areas_to_plot)
                     continue
                 end
 
-                % Convert to string of zeros and ones for calculating run
-                % length.
+                % Convert to string of zeros and ones for textscan
                 exceed_bd_bools = zeros(1, max_val);
                 exceed_bd_bools(exceed_bd_inds) = 1;
                 s = sprintf('%d', exceed_bd_bools);
 
-                % Calculate run length with some MATLAB magic.
+                % Find runs with textscan, then get their lengths
                 runs{j,1} = (find(diff(uint8(s)))+1)'; % inds of first 1 in each run of 1's
                 s = textscan(s, '%s', 'delimiter', '0', 'multipleDelimsAsOne',1); % all runs of 1s
                 s = s{:}; % unpack
@@ -833,8 +832,18 @@ for a = 1:length(areas_to_plot)
 
             % Plot the data as a histogram        
             histogram(data, 'BinEdges', [0:20:500 Inf], ... % 500
-                'Normalization', 'probability', 'DisplayName', KDE(m).Sessions(sessn).ShortName)
+                'Normalization', 'probability', ...
+                'DisplayName', KDE(m).Sessions(sessn).ShortName, ...
+                'FaceColor', mlc(i))
 
+            % Add mean/std above the histogram
+            yl = ylim();
+            mu = mean(data);
+            sigma = std(data);
+            scatter(mu, yl(2)+0.05, 100, '^', 'MarkerFaceColor', mlc(i))
+            plot([mu - sigma, mu+sigma], repelem(yl(2)+0.05,2), ...
+                'LineWidth', 2, 'Color', mlc(i))
+            
             % Store the data
             run_id = sprintf('KDE_EBD_Runs_%s', area); 
             KDE(m).Sessions(sessn).(run_id)= runs;
@@ -875,8 +884,9 @@ for a = 1:length(areas_to_plot)
                 fprintf('%s, session %d, area %s: no signf timepoints \n', KDE(m).Name, sessn, area, h, p)
                 continue
             end
+            data(data == 0) = [];  % remove zeros
             [p,h] = ranksum(data, post_data, 'Alpha', ranksum_alpha, 'tail', 'left');
-            fprintf('%s, session %d, area %s: h = %d, p = %0.3f \n', KDE(m).Name, sessn, area, h, p)
+            fprintf('%s, session %d, area %s, 1-sided ranksum session vs post: h = %d, p = %0.3f \n', KDE(m).Name, sessn, area, h, p)
         end
     end
     
