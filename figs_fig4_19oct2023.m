@@ -514,6 +514,10 @@ for a = 1:length(areas_to_plot)
                 actual_xvals = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.KDEXVals;
                 max_val = length(actual_xvals);
 
+                % Remove anything before 0 for this analysis (makes no
+                % difference)
+                exceed_bd_inds = exceed_bd_inds(exceed_bd_inds > 0);
+                
                 % Catch units with no signf time points
                 if isempty(exceed_bd_inds)
                     runs{j,1} = 0;

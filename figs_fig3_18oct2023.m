@@ -73,6 +73,7 @@ baseline_intervals = {[-150 -50]};
 alpha_string_scale_factor = 100;
 
 rSessionsByMonk = {[7 9] [6 7]}; % pre/post
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 
 %% Stats for text
 area = 'te';
@@ -86,7 +87,7 @@ for m = 1:length(Monkeys)
         tid = get_good_interval_name2(test_int, 'full', 'VisResp_test_img_TTEST'); % with a t-test
         bid = get_good_interval_name2(baseline_int, '', '');
         vr_id = strcat(tid,bid);
-        
+        baseline_props = [];
         for i = 1:length(sessions_to_use)
             sessn = sessions_to_use(i);
 
@@ -102,9 +103,9 @@ for m = 1:length(Monkeys)
             dog_props = sum(data_mat(261:520,:) < vr_alpha) / 260;
             
             % Compare cat and dog props
-            fprintf('%s, %s, %d to %d, %2g images is mean betw-catg diff \n',...
-                Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
-                test_int(1), test_int(2), mean(cat_props - dog_props)*260);
+%             fprintf('%s, %s, %d to %d, %2g images is mean betw-catg diff \n',...
+%                 Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
+%                 test_int(1), test_int(2), mean(cat_props - dog_props)*260);
             
             
             % Find proportion of units responding signf. to at least some fraction
@@ -113,14 +114,14 @@ for m = 1:length(Monkeys)
             overall_props = sum(data_mat < vr_alpha) / 520;
             
             x_10 = sum(overall_props > 0.10);
-            fprintf('%s, %s, %d to %d, %2g%% of units respond to more than 10%% of images \n',...
-                Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
-                test_int(1), test_int(2), round(x_10/n_units*100,1));
+%             fprintf('%s, %s, %d to %d, %2g%% of units respond to more than 10%% of images \n',...
+%                 Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
+%                 test_int(1), test_int(2), round(x_10/n_units*100,1));
             
             x_25 = sum(overall_props > 0.25);
-            fprintf('%s, %s, %d to %d, %2g%% of units respond to more than 25%% of images \n',...
-                Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
-                test_int(1), test_int(2), round(x_25/n_units*100,1));
+%             fprintf('%s, %s, %d to %d, %2g%% of units respond to more than 25%% of images \n',...
+%                 Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName,...
+%                 test_int(1), test_int(2), round(x_25/n_units*100,1));
             
             % Prepare for chi-sq test, which needs [X,N] for each condition
             switch regexp(Monkeys(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
@@ -128,21 +129,27 @@ for m = 1:length(Monkeys)
                 pre_props = {[x_10 n_units], [x_25 n_units]};
             case 'Post'
                 post_props = {[x_10 n_units], [x_25 n_units]};
+            case 'Base'
+                baseline_props = [baseline_props x_10/n_units];
             end
         end
         
+        
+%         fprintf('%s, Baseline, %2g +/- %2g units respond to more than 10%% of imgs \n\n',...
+%             Monkeys(m).Name, round(mean(baseline_props)*100,1), round(std(baseline_props)*100,1))
+        
         % Do stats
-        [h,pval] = prop_test(...
+        [h,pval, chi2stat, df] = prop_test(...
             [pre_props{1}(1) post_props{1}(1)],...
             [pre_props{1}(2) post_props{1}(2)],...
             false, chi_sq_alpha);
-        fprintf('%s, PRE vs POST, %d to %d, chi-sq for 10%% level: %d \n', Monkeys(m).Name, test_int(1), test_int(2), pval)
+        fprintf('%s, PRE vs POST, %d to %d, chi-sq for 10%% level: p=%3g, chisq=%3g \n', Monkeys(m).Name, test_int(1), test_int(2), pval, chi2stat)
         
-        [h,pval] = prop_test(...
+        [h,pval, chi2stat, df] = prop_test(...
             [pre_props{2}(1) post_props{2}(1)],...
             [pre_props{2}(2) post_props{2}(2)],...
             false, chi_sq_alpha);
-        fprintf('%s, PRE vs POST, %d to %d, chi-sq for 25%% level: %d \n', Monkeys(m).Name, test_int(1), test_int(2), pval)
+        fprintf('%s, PRE vs POST, %d to %d, chi-sq for 25%% level: p=%3g, chisq=%3g \n', Monkeys(m).Name, test_int(1), test_int(2), pval, chi2stat)
             
     end
 end
@@ -254,6 +261,7 @@ for m = 1:length(Monkeys)
     diffs = cell(1,length(sessions_to_use));
     sums = cell(1,length(sessions_to_use));
     resids = cell(1,length(sessions_to_use));
+    baseline_diffs = {};
     
     for i = 1:length(sessions_to_use)
         sessn = sessions_to_use(i);
@@ -293,6 +301,7 @@ for m = 1:length(Monkeys)
             case 'Base'
                 col = epoch_colors(1,:);
                 thk = 1;
+                baseline_diffs = [baseline_diffs diffs{i}];
             case 'Pre'
                 col = epoch_colors(2,:);
                 thk = 2;
@@ -368,9 +377,15 @@ for m = 1:length(Monkeys)
     [h,pval] = ttest2(abs(pre_diffs), abs(post_diffs));
     fprintf('ABS DIFFS pre vs post ttest2: h = %d, pval = %0.4f \n', ...
             h, pval)
-    fprintf('Mean+std ABS DIFF pre: %0.2g +/- %0.2g, post: %0.2g + %02.g \n', ...
-        mean(abs(pre_diffs)), std(abs(pre_diffs)), mean(abs(post_diffs)), std(abs(post_diffs)))
         
+    fprintf('Mean+std ABS DIFFS: \n\t pre: %0.2g%% +/- %0.2g%% \n\t post: %0.2g%% +/- %0.2g%% \n', ...
+        mean(abs(pre_diffs))*100, std(abs(pre_diffs))*100,...
+        mean(abs(post_diffs))*100, std(abs(post_diffs))*100)
+        
+%     baseline_means = cellfun(@(x) mean(abs(x)), baseline_diffs);
+%     fprintf('Mean+std of baseline mean diffs: %0.2g%% +/- %0.2g%%\n',...
+%         mean(baseline_means)*100, std(baseline_means)*100)
+    
     % Test sums (did units responsd to more images overall?)
 %     [h,pval] = ttest2(sums{pre_diff_idx}, sums{post_diff_idx});
 %     fprintf('SUMS, pre: %0.0f, post: %0.0f, pre vs post ttest2: h = %d, pval = %0.2f \n', ...

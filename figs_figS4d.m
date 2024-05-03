@@ -1,4 +1,5 @@
 % vogels figs 
+% see: pv_vogels_analyses.m
 
 %% Load data
 clearvars
@@ -111,9 +112,7 @@ rSessionsByMonk = {[7 9] [6 7]};
 ranksum_alpha = 0.05;
 rArrayLocs = {'te'};
 
-nst_iInt_to_plot = 2;  % intervals are [75 175], [175 275], [275 375]
-
-sparseness_iInt_to_plot = 1;  %  % 1,2 are 75-175, 175-275
+sparseness_iInt_to_plot = 2;  %  % 1,2 are 75-175, 175-275, (and Nst also has 275-375)
 
 %% Plot Nst all (without catg)
 
@@ -139,7 +138,7 @@ rSessions = rSessionsByMonk{m};
             
             
             % Get data, store for stats
-            nst = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, 2)/520;
+            nst = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, sparseness_iInt_to_plot)/520;
             if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')
                pre =  nst; 
                color = mlc(1);
@@ -209,9 +208,9 @@ rSessions = rSessionsByMonk{m};
             end
             
             % Get data
-            cats = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, nst_iInt_to_plot, 1)/260;
-            dogs = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, nst_iInt_to_plot, 2)/260;
-            overall = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, nst_iInt_to_plot)/520;
+            cats = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, sparseness_iInt_to_plot, 1)/260;
+            dogs = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, sparseness_iInt_to_plot, 2)/260;
+            overall = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, sparseness_iInt_to_plot)/520;
             
             
             subplot(2,1,m)
@@ -230,6 +229,12 @@ rSessions = rSessionsByMonk{m};
             xlim([0 1]);
             formatPlot(gca, gcf);
             axis square
+            
+            % Test for catg differences
+            [pval, h] = ranksum(cats, dogs,...
+                'alpha', ranksum_alpha, 'tail', 'left');  % test dogs less sparse --> dogs > cats --> Y > X --> left tail
+            fprintf('%s, %s, %s, Nst dog > cat (ranksum): h = %d, p = %0.2f \n',...
+                Monkeys(m).Name, loc, Monkeys(m).Sessions(sessn).ShortName, h, pval)
             
             % Plot data
 %             figure(3)
@@ -255,7 +260,6 @@ end
 
 %% Plot sparseness over sessions
 
-% sparseness_iInt_to_plot = 2;  % 1,2,3 are 75-175, 175-275, 275-375
 figure
 show_shuffle = false;
 for m = 1:length(Monkeys)
@@ -328,9 +332,6 @@ rSessions = rSessionsByMonk{m};
 end
 
 %% Plot sparseness within sessions, cat vs dog
-
-sparseness_iInt_to_plot = 2;  % 1,2 are 75-175, 175-275
-% sparseness_iInt_to_plot = 1;
 
 figure
 
@@ -407,6 +408,115 @@ rSessions = rSessionsByMonk{m};
         [pval, h] = ranksum(pre, post, 'alpha', ranksum_alpha, 'tail', 'left');
         fprintf('%s, %s, overall sparseness pre vs post (ranksum): h = %d, p = %0.2f \n',...
             Monkeys(m).Name, loc, h, pval)
+    end
+end
+
+%% Stats: kruskal-wallis on baseline days
+
+rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+kw_alpha = 0.05;
+rArrayLocs = {'te'};
+sparseness_iInt_to_plot = 2;  %  % 1,2 are 75-175, 175-275, (and Nst also has 275-375)
+
+%% Nst over baseline days
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    baseline_nsts = {};
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            
+            % Get indices of units in the pValues matrix to use in calculating
+            % proprotion of units with signf GLMs
+            if strcmp(loc, 'te')
+                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Area}, loc);
+            else
+                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
+            end
+            
+            % Get data
+            nst = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, sparseness_iInt_to_plot)/520;
+%             baseline_nsts = [baseline_nsts nst];
+            if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')
+               pre =  nst; 
+            elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post.*')
+                post = nst;
+            elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Base.*')
+                baseline_nsts = [baseline_nsts nst];
+            end
+        end
+        
+        % Convert to one long vec for kw test
+        % Preallocate arrays for efficiency
+        data = [];
+        groups = [];
+
+        % Loop through each group in the cell array
+        for groupId = 1:length(baseline_nsts)
+            currentGroupData = baseline_nsts{groupId};  % Extract data for current group
+            data = [data; currentGroupData(:)];  % Add to data vector
+            groups = [groups; groupId * ones(length(currentGroupData), 1)];  % Add to group ID vector
+        end
+        [p, tbl, stats] = kruskalwallis(data, groups);
+        if p < kw_alpha
+            fprintf('%s, %s, %s, kw baseline: p = %0.3f \n',...
+                Monkeys(m).Name, loc, Monkeys(m).Sessions(sessn).ShortName, p)
+           c = multcompare(stats); 
+           pause
+        end
+    end
+end
+
+%% Sparseness index over baseline days
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    baseline_sparsenesses = {};
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            
+            % Get indices of units in the pValues matrix to use in calculating
+            % proprotion of units with signf GLMs
+            if strcmp(loc, 'te')
+                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Area}, loc);
+            else
+                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
+            end
+            
+            % Get data
+            s_indices = Monkeys(m).Sessions(sessn).Unit_sparseness(units, sparseness_iInt_to_plot); 
+            baseline_sparsenesses = [baseline_sparsenesses s_indices];
+%             if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')
+%                pre =  s_indices; 
+%             elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post.*')
+%                 post = s_indices;
+%             elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Base.*')
+%                 baseline_sparsenesses = [baseline_sparsenesses s_indices];
+%             end
+        end
+        
+        % Convert to one long vec for kw test
+        % Preallocate arrays for efficiency
+        data = [];
+        groups = [];
+
+        % Loop through each group in the cell array
+        for groupId = 1:length(baseline_sparsenesses)
+            currentGroupData = baseline_sparsenesses{groupId};  % Extract data for current group
+            data = [data; currentGroupData(:)];  % Add to data vector
+            groups = [groups; groupId * ones(length(currentGroupData), 1)];  % Add to group ID vector
+        end
+        [p, tbl, stats] = kruskalwallis(data, groups);
+        if p < kw_alpha
+            fprintf('%s, %s, %s, sparseness index kw baseline: p = %0.3f \n',...
+                Monkeys(m).Name, loc, Monkeys(m).Sessions(sessn).ShortName, p)
+           c = multcompare(stats); 
+           pause
+        end
     end
 end
 

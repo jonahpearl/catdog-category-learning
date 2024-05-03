@@ -200,7 +200,7 @@ plot_alpha = 0.4; % transparency of sem fill
 mkYLims = {[0.45 0.85], [0.45 0.65]};
 
 
-figure2('Position', [400 400 1000 600])
+figure2('Position', [400 400 600 800])
 % tiledlayout(length(Monkeys), length(rArrayLocs))
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -258,9 +258,13 @@ for m = 1:length(Monkeys)
                     grays = gray(10);
                     color_idxs = round(linspace(0,10,nclust+1))+1;
                     for iClust = 1:nclust
-                        plot(starts(Monkeys(m).(sigID2){iClust}), mkYLims{m}(2)-0.02,...
+%                         plot(starts(Monkeys(m).(sigID2){iClust}), mkYLims{m}(2)-0.02,...
+%                             'ko', 'MarkerFaceColor', grays(color_idxs(iClust), :),...
+%                             'MarkerEdgeColor', 'none')
+                            plot(starts(Monkeys(m).(sigID2){iClust}), 0.8,...
                             'ko', 'MarkerFaceColor', grays(color_idxs(iClust), :),...
                             'MarkerEdgeColor', 'none')
+
                     end
                 end
             catch
@@ -275,8 +279,9 @@ for m = 1:length(Monkeys)
             end
             
             % Make graphs have the same y-axes within each monkey
-            ylim(mkYLims{m})
-            
+%             ylim(mkYLims{m})
+            ylim([0.45, 0.8])
+            yticks([0.5, 0.625, 0.75])
             % Detailed labels if desired
             %             ylabel('SVM abcat accuracy (mean +/- SEM)')
             title(sprintf('%s', loc), 'Interpreter', 'none')
@@ -427,10 +432,15 @@ sigmoid = fittype('a1/(1 + exp(-b1*(x-c1))) + d',...
     'dependent', 'y', 'independent', 'x',...
     'coefficients', {'a1', 'b1', 'c1', 'd'});
 
-lower_n_units_val_by_monk = [3 2];  % to allow a decent sigmoid fit
+% lower_n_units_val_by_monk = [3 2];  % to allow a decent sigmoid fit
+lower_n_units_val_by_monk = [3 3];  % change to same val for consistency
 ylims_by_monk = {[0.63, 0.8], [0.54, 0.63]};
 
 % lower_n_units_val_by_monk = [2 1]; % to see what a bad fit looks like...
+
+xtickvals = [3, 10, 25, 50, 100];
+
+fig_path = '~/Documents/BJR group/Catdog_paper/';
 
 for m = 1:length(Monkeys)
     rng(random_seed)
@@ -535,31 +545,35 @@ for m = 1:length(Monkeys)
                         round(f.d, 3))
             end
             set(gca, 'XScale', 'log')
-            xlabel('Log10 num best units used')
+            xlabel('Num best units used')
             ylabel('Accuracy')
             title(sprintf('%s, interval %d - %d', Monkeys(m).Name, interval(1), interval(2)), 'Interpreter', 'none')
 %             legend
             ylim(ylims_by_monk{m})
+%             ylim([0.5, 0.8])
+            xticks(log10(xtickvals))
+            xticklabels(xtickvals)
             formatSVMPlot(gca, gcf, 16)
+            saveas(gcf, fullfile(fig_path, sprintf('%s_SVMs_sigmoid.pdf', Monkeys(m).Name)))
             
             % Compare pre/post coeff conf ints
-            n_coeffs = 5;
-            coeff_names = {'Amp', 'Shape', 'Midpoint', 'Intercept', 'Midpt Slope'};
-            figure
-            for iCoeff = 1:n_coeffs
-                subplot(1,n_coeffs,iCoeff)
-                hold on
-                pre_int = confint_results{pre_sessn}(:,iCoeff);
-                pre_mean = coeff_means{pre_sessn}(iCoeff);
-                post_int = confint_results{post_sessn}(:,iCoeff);
-                post_mean = coeff_means{post_sessn}(iCoeff);
-                errorbar(0, pre_mean, pre_int(1) - pre_mean, pre_int(2) - pre_mean, 'color', mlc(1), 'LineWidth', 2)
-                errorbar(1, post_mean, post_int(1) - post_mean, post_int(2) - post_mean, 'color', mlc(2), 'LineWidth', 2)
-                title(coeff_names{iCoeff})
-                formatSVMPlot(gca, gcf, 16)
-            end
-            sgtitle(sprintf('%s, interval %d - %d', Monkeys(m).Name, interval(1), interval(2)), 'Interpreter', 'none')
-            
+%             n_coeffs = 5;
+%             coeff_names = {'Amp', 'Shape', 'Midpoint', 'Intercept', 'Midpt Slope'};
+%             figure
+%             for iCoeff = 1:n_coeffs
+%                 subplot(1,n_coeffs,iCoeff)
+%                 hold on
+%                 pre_int = confint_results{pre_sessn}(:,iCoeff);
+%                 pre_mean = coeff_means{pre_sessn}(iCoeff);
+%                 post_int = confint_results{post_sessn}(:,iCoeff);
+%                 post_mean = coeff_means{post_sessn}(iCoeff);
+%                 errorbar(0, pre_mean, pre_int(1) - pre_mean, pre_int(2) - pre_mean, 'color', mlc(1), 'LineWidth', 2)
+%                 errorbar(1, post_mean, post_int(1) - post_mean, post_int(2) - post_mean, 'color', mlc(2), 'LineWidth', 2)
+%                 title(coeff_names{iCoeff})
+%                 formatSVMPlot(gca, gcf, 16)
+%             end
+%             sgtitle(sprintf('%s, interval %d - %d', Monkeys(m).Name, interval(1), interval(2)), 'Interpreter', 'none')
+%             saveas(gcf, fullfile(fig_path, sprintf('%s_SVM_sigmoid_params.pdf', Monkeys(m).Name)))
         end
     end
 end
