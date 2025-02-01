@@ -107,12 +107,15 @@ end
 %% Set sessions to use and xtick names and colors
 xtickcolors = cbrewer('qual', 'Dark2', 3);
 xtickcolors = xtickcolors([3 2 1], :);
+all_arrays = {'anterior', 'middle', 'posterior'};
 for m = 1:length(Monkeys)
     if strcmp(Monkeys(m).Name, 'Marta_fix_cat_xma2')
 %         Monkeys(m).Sessions_to_use = [1 2 3 5 6 7 9];
 %         Monkeys(m).XTickLabs= {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
+%         Monkeys(m).Sessions_to_use = [7 9];
+%         Monkeys(m).XTickLabs= {'Pre', 'Post'};
         Monkeys(m).Sessions_to_use = [7 9];
-        Monkeys(m).XTickLabs= {'Pre', 'Post'};
+        Monkeys(m).XTickLabs= {'Pre', 'Post2'};
 
         Monkeys(m).Code = 'R';
     elseif strcmp(Monkeys(m).Name, 'Max_fix_cat_xma2')
@@ -123,6 +126,54 @@ for m = 1:length(Monkeys)
 
         Monkeys(m).Code = 'X';
     end
+end
+
+%% Bar plot of unit array / amount across days
+arrays_to_plot = {'anterior', 'middle', 'posterior'};
+
+for m = 1:length(Monkeys)
+    
+    % Create subplot
+    subplot(2,1,m)
+    hold on
+    
+    % Plotting params
+    sessions_to_use = Monkeys(m).Sessions_to_use;
+    xticklabs = Monkeys(m).XTickLabs;
+    
+    % Pre allocate
+    nUnits = zeros(length(sessions_to_use), length(all_arrays));
+    nVR_Units = zeros(length(sessions_to_use), length(all_arrays));
+    
+    % Get data to plot
+    for i = 1:length(sessions_to_use)
+        sessn = sessions_to_use(i);
+        arrays = unique({Monkeys(m).Sessions(sessn).UnitInfo.Location});
+%         VR_bools = [Monkeys(m).Sessions(sessn).UnitInfo.(vrID)] < vr_alpha;
+        for j = 1:length(arrays_to_plot)
+            array_bools = strcmp(arrays_to_plot{j}, {Monkeys(m).Sessions(sessn).UnitInfo.Location});
+            nUnits(i,j) = sum(array_bools);
+%             nVR_Units(i,j) = sum(array_bools & VR_bools);
+        end
+    end
+    
+    % Tell MATLAB to repeat only the first three default colors
+    cols = colororder;
+    colororder(cols(1:3,:))
+    
+    % Plot all neurons with empty bars 
+    b = bar(nUnits, 'grouped');
+    for iB = 1:length(b)
+        b(iB).EdgeColor = b(iB).FaceColor;
+    end
+    
+    % Format the plot
+    xticks(1:length(nUnits))
+    xticklabels(xticklabs)
+    ylim([0 150])
+    yticks(0:75:150)
+    ylabel('# units')
+    formatPlot(gca, gcf)
 end
 
 %% Collect spike counts
@@ -195,8 +246,8 @@ end
 
 % test_intervals = {[75 175], [175 275], [275 375], [75 375]};
 % baseline_intervals = {[-150 -50], [-150 -50], [-150 -50], [-250 50]};
-% test_intervals = {[75 175], [175 350], [175 275]};
-% baseline_intervals = {[-150 -50], [-175 0], [-150 -50]};
+test_intervals = {[75 175], [175 275]};
+baseline_intervals = {[-150 -50], [-150 -50]};
 
 
 by = 'all'; % other option is by image
@@ -278,16 +329,16 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% Bar plot of unit array / amount across days
+%% Bar plot of unit array / amount across days with VR info
 
-% test_interval = {[75 175]};
-% baseline_interval = {[-150 -50]};
-test_interval = {[175 350]};
-baseline_interval = {[-175 0]};
+test_interval = [75 175];
+baseline_interval = [-150 -50];
+% test_interval = [175 350];
+% baseline_interval = [-175 0];
 % test_interval = {[175 275]};
 % baseline_interval = {[-150 -50]};
-tid = get_good_interval_name2(test_int, 'full', 'VisResp_all_test');
-bid = get_good_interval_name2(baseline_int, '', '');
+tid = get_good_interval_name2(test_interval, 'full', 'VisResp_all_test');
+bid = get_good_interval_name2(baseline_interval, '', '');
 vrID = strcat(tid,bid);
 vr_alpha = 0.001;
 
@@ -469,3 +520,13 @@ for m = 1:length(Monkeys)
     sgtitle(sprintf('%s, VR units (all stims)', Monkeys(m).Name))
 end
 
+%% Functions
+
+function formatPlot(ax, fig)
+set(ax, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+    'XMinorTick', 'off', 'YMinorTick', 'off',...
+    'fontsize',15, 'YGrid', 'on', 'XGrid', 'on',...
+    'fontname', 'Helvetica',...
+    'XColor', 'black', 'YColor', 'black')
+set(fig, 'Color', 'white')
+end

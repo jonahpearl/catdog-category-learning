@@ -12,10 +12,47 @@ spikeCountPath = 'XMA2/Spike_count_mats';
 
 % Load behavioral data
 load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior and neural summaries, but w/o spike times
+TE_LOCS = {'anterior', 'middle', 'posterior'};
 
 % Interval parameters for loading spike count mat
 step = 5;
 width = 100;
+
+%% Add 'area' label to unitinfo, get short session names
+
+% add Area labels
+for m = 1:length(Monkeys)
+    for i = 1:length(Monkeys(m).Sessions)
+        for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
+            switch Monkeys(m).Sessions(i).UnitInfo(j).Location
+                case 'posterior'
+                    Monkeys(m).Sessions(i).UnitInfo(j).Area = 'te';
+                case 'middle'
+                    Monkeys(m).Sessions(i).UnitInfo(j).Area = 'te';
+                case 'anterior'
+                    Monkeys(m).Sessions(i).UnitInfo(j).Area = 'te';
+                case 'teo'
+                    Monkeys(m).Sessions(i).UnitInfo(j).Area = 'teo';
+            end
+        end
+    end
+end
+
+marta_xls = fullfile(EXT_HD, 'RecordingMarta.xlsx');
+max_xls = fullfile(EXT_HD, 'RecordingMax.xlsx');
+verification_string = 'cats';
+
+for m = 1:length(Monkeys)
+    date_strs = {Monkeys(m).Sessions.DateStr};
+    if regexp(Monkeys(m).Name, 'Marta\w*')
+        short_names = get_short_names(date_strs, marta_xls, sprintf('\\w*%s\\w*', verification_string)); % need double \\ to get single \ in output
+    else
+        short_names = get_short_names(date_strs, max_xls, sprintf('\\w*%s\\w*', verification_string));
+    end
+    for i = 1:length(Monkeys(m).Sessions)
+        Monkeys(m).Sessions(i).ShortName = short_names{i};
+    end
+end
 
 %% Collect Session Y (image id and catg id)
 % very fast
@@ -50,8 +87,8 @@ end
 
 % Params
 thresh_percent = 30;
-% rSessionsByMonk = {[7 9], [6 7]};
-rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+rSessionsByMonk = {[7 9], [6 7]};
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 ignoreVal = 20;
 baseline_norm = false;
 runShuffle = false;
@@ -173,10 +210,12 @@ end
 
 save(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_Nst_sharedMax.mat'), 'Monkeys')
 
-%% Run sparseness analysis
+%% Run sparseness analysis (pretty fast)
 
-% Calculates sparseness of trial-averaged stimulus responses (spike
-% counts).
+% Calculates sparseness of average stimulus responses (spike counts) per
+% unit. That is to say, for each unit, construct a 1 x (num images) mean
+% response vector, then calculate that vector's sparseness.
+
 % This follows Vogels 1999, tho NB Vogels uses per-trial baseline-subtracted spike
 % counts, these spike counts aren't adjusted at all.
 % Close to 0: very sparse. 1: totally uniform.
@@ -187,6 +226,7 @@ rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 ignoreVal = 20;
 baseline_norm = false;
 runShuffle = false;
+nShuffles = 10;
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -205,10 +245,13 @@ for m = 1:length(Monkeys)
         % Manually reduce intervals tested
         warning('Reducing intervals tested...comment out these lines to run all intervals')
         rIntervals_original = rIntervals; % for finding idx in 3rd dim of X_full
-        rIntervals = {[75 175], [175 275], [275 375]}; % for controlling loops
+        rIntervals = {[75 175], [175 275]}; % for controlling loops
+%         rIntervals = {[175 275]}; % for controlling loops
         
         % Pre-allocate the storage vectors
         sparseness = zeros(size(X_full,2), length(rIntervals));
+        dog_sparseness = zeros(size(X_full,2), length(rIntervals));
+        cat_sparseness = zeros(size(X_full,2), length(rIntervals));
         
         if runShuffle
             sparseness_SHUFFLE = zeros(size(X_full,2), length(rIntervals), nShuffles);
@@ -233,11 +276,16 @@ for m = 1:length(Monkeys)
                 stim_means = splitapply(@mean, spike_counts, Y_imgIDs); % god bless MATLAB becoming more like python
                 sparseness(iUnit, iInt) = calculate_sparseness(stim_means);
                 
+                % Run cat/dog specific sparsenesses
+                cat_sparseness(iUnit, iInt) = calculate_sparseness(stim_means(1:260));
+                dog_sparseness(iUnit, iInt) = calculate_sparseness(stim_means(261:end));
+                
+                
                 % Run with shuffled values if requested
                 if runShuffle
                     for iShuff = 1:nShuffles
                         stim_means = splitapply(@mean, spike_counts, Y_imgIDs(randperm(length(Y_imgIDs)))); % god bless MATLAB becoming more like python
-                        sparseness_SHUFFLE(iUnit, iInt, iShuff) = sparseness(stim_means);
+                        sparseness_SHUFFLE(iUnit, iInt, iShuff) = calculate_sparseness(stim_means);
                     end
                 end
             end
@@ -248,6 +296,8 @@ for m = 1:length(Monkeys)
         
         % Store data.
         Monkeys(m).Sessions(sessn).Unit_sparseness = sparseness;
+        Monkeys(m).Sessions(sessn).Unit_sparseness_cat = cat_sparseness;
+        Monkeys(m).Sessions(sessn).Unit_sparseness_dog = dog_sparseness;
         
         if runShuffle
             Monkeys(m).Sessions(sessn).Unit_sparseness_SHUFFLE = sparseness_SHUFFLE;
@@ -366,6 +416,9 @@ data = load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_sparseness.mat'), 'Monkeys'
 for m = 1:length(data.Monkeys)
     for i = 1:length(data.Monkeys(m).Sessions)
         Monkeys(m).Sessions(i).Unit_sparseness = data.Monkeys(m).Sessions(i).Unit_sparseness;
+        Monkeys(m).Sessions(i).Unit_sparseness_dog = data.Monkeys(m).Sessions(i).Unit_sparseness_dog;
+        Monkeys(m).Sessions(i).Unit_sparseness_cat = data.Monkeys(m).Sessions(i).Unit_sparseness_cat;
+%         Monkeys(m).Sessions(i).Unit_sparseness_SHUFFLE = data.Monkeys(m).Sessions(i).Unit_sparseness_SHUFFLE;
     end
 end
 clear data
@@ -391,17 +444,18 @@ end
 clear data
 
 %% Plotting params
-rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
-% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+% rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
+rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 % rSessionsByMonk = {[1 6 7 9], [1 5 6 7]};
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
 % rArrayLocs = {'te', 'SHUFFLE_te'}; 
-% rArrayLocs = {'te'};
+rArrayLocs = {'te'};
+
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
-rArrayLocs = {'anterior', 'middle', 'posterior'}; 
+% rArrayLocs = {'anterior', 'middle', 'posterior'}; 
 
 %% Plot mean-responsive data
 
@@ -455,12 +509,16 @@ rSessions = rSessionsByMonk{m};
         
     end
 end
+
 %% Plot Nst all (without catg)
 
 ranksum_alpha = 0.05;
 
+close all
 figure(1)
 figure(2)
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+rSessionsByMonk = {[7 9] [6 7]};
 
 for m = 1:length(Monkeys)
 
@@ -480,47 +538,65 @@ rSessions = rSessionsByMonk{m};
                 units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
             end
             
-            % Get interval to use
-            idx = 2;
             
             % Get data, store for stats
             nst = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, 2)/520;
             if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')
                pre =  nst; 
+               color = mlc(1);
+               lw = 1.5;
             elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post.*')
                 post = nst;
+                color = mlc(2);
+                lw = 1.5;
+            else
+                color = [0.4 0.4 0.4];
+                lw = 0.75;
             end
             
             % Plot data
-            figure(1)
-            subplot(2,2, sub2ind([2,2], i, m))
-            hold on
-            title(sprintf('%s, session %s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName))
-            ecdf(nst)
-            legend(rArrayLocs)
-            xlim([0 1])
             
+            % One subplot per session
+%             figure(1)
+%             subplot(2, length(rSessions), sub2ind([length(rSessions),2], i, m))
+%             hold on
+%             title(sprintf('%s, session %s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName))
+%             ecdf(nst)
+%             legend(rArrayLocs)
+%             xlim([0 1])
+            
+            % One subplot per array, comparing sessions
             figure(2)
-            subplot(2,3, sub2ind([3,2], iLoc, m))
+            subplot(2, length(rArrayLocs), sub2ind([length(rArrayLocs), 2], iLoc, m))
             hold on
-            ecdf(nst)
+            [f,x] = ecdf(nst);
+%             plot(x,f, 'DisplayName', Monkeys(m).Sessions(sessn).ShortName, 'Color', color, 'LineWidth', lw)
+            plot(x,f, 'Color', color, 'LineWidth', lw)
             title(sprintf('%s, %s', Monkeys(m).Name, loc))
-            legend({'Pre', 'Post'})
+%             legend({'Pre', 'Post'})
             xlim([0 1])
         end
         
-        % Stats test pre vs post
-        [pval, h] = ranksum(pre, post, 'alpha', ranksum_alpha);
+        figure(2)
+        formatPlot(gca, gcf)
+%         legend
+        
+        % Stats test pre vs post: test for broadening of tuning curves
+        [pval, h] = ranksum(pre, post, 'alpha', ranksum_alpha, 'tail', 'left');
         fprintf('%s, %s, Nst pre vs post (ranksum): h = %d, p = %0.2f \n',...
             Monkeys(m).Name, loc, h, pval)
-            
+          
     end
 end
 
 %% Scatter Nst cat vs Nst dog
-figure(3)
-figure(4)
-
+% figure(3)
+% figure(4)
+rSessionsByMonk = {[7 9], [6 7]};
+rArrayLocs = {'te'};
+nst_iInt_to_plot = 2;  % intervals are [75 175], [175 275], [275 375]
+ 
+figure('Position', [400 400 400 400])
 for m = 1:length(Monkeys)
 
 rSessions = rSessionsByMonk{m};
@@ -539,31 +615,55 @@ rSessions = rSessionsByMonk{m};
                 units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
             end
             
-            % Get interval to use
-            idx = 2;
+            if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')  
+               lstyle = '--';
+            elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post.*')
+                lstyle = '-';
+            else
+                lstyle = '-';
+            end
             
             % Get data
-            cats = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, 2, 1)/520;
-            dogs = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, 2, 2)/520;
+            cats = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, nst_iInt_to_plot, 1)/260;
+            dogs = Monkeys(m).Sessions(sessn).Nst.Nst_catdog(units, nst_iInt_to_plot, 2)/260;
+            overall = Monkeys(m).Sessions(sessn).Nst.Nst_all(units, nst_iInt_to_plot)/520;
+            
+            
+            subplot(2,1,m)
+            hold on
+            [f,x] = ecdf(cats);
+            plot(x,f, 'Color', 'red', 'LineStyle', lstyle)
+            [f,x] = ecdf(dogs);
+            plot(x,f, 'Color', 'blue','LineStyle', lstyle)
+            
+            [f,x] = ecdf(overall);
+            plot(x,f, 'Color', 'k', 'LineStyle', lstyle)
+            
+            
+            title(sprintf('%s, %s', Monkeys(m).Name, loc));
+%             legend({'Pre', 'Post'})
+            xlim([0 1]);
+            formatPlot(gca, gcf);
+            axis square
             
             % Plot data
-            figure(3)
-            subplot(2,2, sub2ind([2,2], i, m))
-            hold on
-            title(sprintf('%s, session %s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName))
-            scatter(dogs, cats, 'filled')
-            legend(rArrayLocs)
-            xlim([0 1])
-            ylim([0 1])
-            
-            figure(4)
-            subplot(2,3, sub2ind([3,2], iLoc, m))
-            hold on
-            scatter(dogs, cats, 'filled')
-            title(sprintf('%s, %s', Monkeys(m).Name, loc))
-            legend({'Pre', 'Post'})
-            xlim([0 1])
-            ylim([0 1])
+%             figure(3)
+%             subplot(2,2, sub2ind([2,2], i, m))
+%             hold on
+%             title(sprintf('%s, session %s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName))
+%             scatter(dogs, cats, 'filled')
+%             legend(rArrayLocs)
+%             xlim([0 1])
+%             ylim([0 1])
+%             
+%             figure(4)
+%             subplot(2,3, sub2ind([3,2], iLoc, m))
+%             hold on
+%             scatter(dogs, cats, 'filled')
+%             title(sprintf('%s, %s', Monkeys(m).Name, loc))
+%             legend({'Pre', 'Post'})
+%             xlim([0 1])
+%             ylim([0 1])
         end
     end
 end
@@ -750,8 +850,18 @@ end
 % saveas(f1, fullfile(figureSavePath, sprintf('VR_scatter_%s', propn_id)), 'epsc')
 % saveas(f2, fullfile(figureSavePath, sprintf('VR_hist_%s', propn_id)), 'epsc')
 
-%% Plot sparseness
+%% Plot sparseness over sessions
+rSessionsByMonk = {[7 9] [6 7]};
 
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+rArrayLocs = {'te'};
+ranksum_alpha = 0.05;
+show_shuffle = false;  % not actually that helpful
+
+idx_in_sparseness_mat = 1;  % oops, overwrote w just 175-275, but w shuffle
+% idx_in_sparseness_mat = 2;  % 1,2,3 are 75-175, 175-275, 275-375
+
+close all
 figure(1)
 figure(2)
 
@@ -768,33 +878,160 @@ rSessions = rSessionsByMonk{m};
             % Get indices of units in the pValues matrix to use in calculating
             % proprotion of units with signf GLMs
             if strcmp(loc, 'te')
-                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Area}, loc);
+                units = ismember({Monkeys(m).Sessions(sessn).UnitInfo.Location}, TE_LOCS);
             else
-                units = strcmp({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
+                units = ismember({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
             end
             
-            % Get interval to use
-            idx = 2;
+            sparsenesss_indexes = Monkeys(m).Sessions(sessn).Unit_sparseness(units, idx_in_sparseness_mat); 
+            if show_shuffle
+                sparsenesss_indexes_shuff = Monkeys(m).Sessions(sessn).Unit_sparseness_SHUFFLE(units, idx_in_sparseness_mat, :); 
+            end
+            if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')
+               pre = sparsenesss_indexes; 
+               color = mlc(1);
+               lw = 1.5;
+            elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post.*')
+                post = sparsenesss_indexes;
+                color = mlc(2);
+                lw = 1.5;
+            else
+                color = [0.4 0.4 0.4];
+                lw = 0.75;
+            end
             
-            % Plot data
+            
+            % Prep the ecdf plot
+            [f, x] = ecdf(sparsenesss_indexes);
+            
+            % Make the plot
             figure(1)
-            subplot(2,2, sub2ind([2,2], i, m))
+            subplot(2, length(rArrayLocs), sub2ind([length(rArrayLocs), 2], iLoc, m))
             hold on
-            title(sprintf('%s, session %s', Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName))
-            ecdf(Monkeys(m).Sessions(sessn).Unit_sparseness(units, 2))
-            legend(rArrayLocs)
-            xlim([0 1])
             
-            figure(2)
-            subplot(2,3, sub2ind([3,2], iLoc, m))
-            hold on
-            ecdf(Monkeys(m).Sessions(sessn).Unit_sparseness(units, 2))
+%             plot(x, f, 'Color', mlc(i), 'DisplayName', Monkeys(m).Sessions(sessn).ShortName)
+            plot(x, f, 'Color', color, 'LineWidth', lw)
             title(sprintf('%s, %s', Monkeys(m).Name, loc))
-            legend({'Pre', 'Post'})
             xlim([0 1])
+%             xlabel('"Sparseness index" (inverse sparseness)')
+            xlabel('s')
+            
+            % Show shuffle if requested
+            if show_shuffle
+                for iShuff=1:nShuffles
+                    [f_shuff, x_shuff] = ecdf(sparsenesss_indexes_shuff(:,:,iShuff));
+                    plot(x_shuff, f_shuff, 'Color', color, 'LineWidth', lw-1, 'LineStyle', '--')
+                end
+            end
+            
         end
+        % Stats test pre vs post: test for broadening of tuning curves (ie
+        % greater sparseness index [i know, it's confusing that going up
+        % means less sparseness...that's just how vogels defined it]).
+        [pval, h] = ranksum(pre, post, 'alpha', ranksum_alpha, 'tail', 'left');
+        fprintf('%s, %s, Nst pre vs post (ranksum): h = %d, p = %0.2f \n',...
+        Monkeys(m).Name, loc, h, pval)
+        formatPlot(gca, gcf)
     end
 end
+
+%% Plot sparseness within sessions, cat vs dog
+rSessionsByMonk = {[7 9] [6 7]};
+rArrayLocs = {'te'};
+ranksum_alpha = 0.05;
+
+idx_in_sparseness_mat = 2;  % 1,2 are 75-175, 175-275
+% idx_in_sparseness_mat = 1;
+
+close all
+figure(1)
+
+for m = 1:length(Monkeys)
+
+rSessions = rSessionsByMonk{m};
+        
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
+        
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            
+            % Get indices of units in the pValues matrix to use in calculating
+            % proprotion of units with signf GLMs
+            if strcmp(loc, 'te')
+                units = ismember({Monkeys(m).Sessions(sessn).UnitInfo.Location}, TE_LOCS);
+            else
+                units = ismember({Monkeys(m).Sessions(sessn).UnitInfo.Location}, loc);
+            end
+            
+            sparsenesss_indexes = Monkeys(m).Sessions(sessn).Unit_sparseness(units, idx_in_sparseness_mat); 
+            sparsenesss_indexes_cat = Monkeys(m).Sessions(sessn).Unit_sparseness_cat(units, idx_in_sparseness_mat); 
+            sparsenesss_indexes_dog = Monkeys(m).Sessions(sessn).Unit_sparseness_dog(units, idx_in_sparseness_mat); 
+            
+            if regexp(Monkeys(m).Sessions(sessn).ShortName, 'Pre.*')
+               pre = sparsenesss_indexes; 
+               color = mlc(1);
+               lw = 1.5;
+               lstyle = '--';
+            elseif regexp(Monkeys(m).Sessions(sessn).ShortName, 'Post.*')
+                post = sparsenesss_indexes;
+                color = mlc(2);
+                lw = 1.5;
+                lstyle = '-';
+            else
+                color = [0.4 0.4 0.4];
+                lw = 0.75;
+            end
+            
+            
+            % Make the plot
+            figure(1)
+%             subplot(2, length(rSessions), sub2ind([length(rSessions), 2], i, m))
+            subplot(2,1,m)
+            hold on
+            
+            % Plot overall popn sparseness
+%             [f, x] = ecdf(sparsenesss_indexes);
+%             plot(x, f, 'Color', 'k', 'LineWidth', lw, 'DisplayName', 'overall', 'LineStyle', lstyle)
+            
+            % Category-specific
+            [f, x] = ecdf(sparsenesss_indexes_cat);
+            plot(x, f, 'Color', 'red', 'LineWidth', lw, 'DisplayName', 'overall', 'LineStyle', lstyle)
+            [f, x] = ecdf(sparsenesss_indexes_dog);
+            plot(x, f, 'Color', 'blue', 'LineWidth', lw, 'DisplayName', 'overall', 'LineStyle', lstyle)
+            
+            % Test for catg differences
+            [pval, h] = ranksum(sparsenesss_indexes_cat, sparsenesss_indexes_dog,...
+                'alpha', ranksum_alpha, 'tail', 'left');  % test dogs less sparse --> dogs > cats --> Y > X --> left tail
+            fprintf('%s, %s, %s, sparseness dog > cat (ranksum): h = %d, p = %0.2f \n',...
+                Monkeys(m).Name, loc, Monkeys(m).Sessions(sessn).ShortName, h, pval)
+            
+            [pval, h] = ranksum(sparsenesss_indexes_cat, sparsenesss_indexes_dog,...
+                'alpha', ranksum_alpha);  % test two sided
+            fprintf('%s, %s, %s, sparseness dog vs cat (ranksum): h = %d, p = %0.2f \n',...
+                Monkeys(m).Name, loc, Monkeys(m).Sessions(sessn).ShortName, h, pval)
+            
+            
+            title(sprintf('%s, %s', Monkeys(m).Name, loc),...
+                'Interpreter', 'none')
+            xlim([0 1])
+%             xlabel('"Sparseness index" (inverse sparseness)')
+            xlabel('s')
+            formatPlot(gca, gcf)
+            
+        end
+        % Stats test pre vs post: test for broadening of tuning curves (ie
+        % greater sparseness index [i know, it's confusing that going up
+        % means less sparseness...that's just how vogels defined it]).
+        [pval, h] = ranksum(pre, post, 'alpha', ranksum_alpha, 'tail', 'left');
+        fprintf('%s, %s, overall sparseness pre vs post (ranksum): h = %d, p = %0.2f \n',...
+            Monkeys(m).Name, loc, h, pval)
+        
+        fprintf("\n")
+    end
+end
+
+
 
 %% Functions
 function formatPlot(ax, fig)

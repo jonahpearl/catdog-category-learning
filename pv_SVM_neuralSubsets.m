@@ -1,5 +1,5 @@
 % abcat SVM on subsets of neur. pop. containing strongest catg encoding
-% units (via GLM coeffs -- can try other ranking metrics as well)
+% units
 
 % now used for timecourses as well
 
@@ -10,12 +10,42 @@ close all
 % Define paths to data
 EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
 CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
+
+% Use this for main analyses
 svmRecordPath = 'XMA2/Monkey_structs/SVM_Records.mat';
 pv_path = 'XMA2/Monkey_structs';
+behav_file = 'MaxMarta_xma2_behav_and_metaNI.mat';
+spikeCountPath = 'XMA2/Spike_count_mats';
+short_name_regexp = '\w*cats\w*';
+
+% Use this for car/truck
+% svmRecordPath = 'XMA2/Monkey_structs/SVM_Records.mat';
+% pv_path = 'XMA2/Monkey_structs';
+% spikeCountPath = 'XMA2/Spike_count_mats_CARTRUCK';  % car truck skip
+% behav_file = 'MaxMarta_xma2_CARTRUCK_ni.mat';
+% short_name_regexp = '\w*cars\w*';
+
 fullSVMPath = fullfile(EXT_HD, pv_path, 'SVM_results_%g.mat');
 
 % Load behavioral data
-load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior and neural summaries, but w/o spike times
+load(fullfile(EXT_HD, pv_path, behav_file)) % behavior and neural summaries, but w/o spike times
+
+
+%% If needed, get date strs and short names of sessions
+marta_xls = fullfile(EXT_HD, 'RecordingMarta.xlsx');
+max_xls = fullfile(EXT_HD, 'RecordingMax.xlsx');
+
+for m = 1:length(Monkeys)
+    date_strs = {Monkeys(m).Sessions.DateStr};
+    if regexp(Monkeys(m).Name, 'Marta\w*')
+        shortNames = get_short_names(date_strs, marta_xls, short_name_regexp);
+    else
+        shortNames = get_short_names(date_strs, max_xls, short_name_regexp);
+    end
+    for i = 1:length(Monkeys(m).Sessions)
+        Monkeys(m).Sessions(i).ShortName = shortNames{i};
+    end
+end
 
 %% Set decoding parameters
 
@@ -37,10 +67,10 @@ have come online with better tuning than observed before. My
 % Params specific to this analysis. 
 
 % num_best_units_to_use = 1:1:100;
-% num_best_units_to_use = [1:1:50 52:2:200];
+% num_best_units_to_use = [1:2:50 52:4:200];
 % num_best_units_to_use = [50 100 110 120 150 175];
 % num_best_units_to_use = [10 25 50 100];
-num_best_units_to_use = [100];
+num_best_units_to_use = [100];  % defaulting to 100 for timecourse too now, because MATLAB's SPARSA solver does better at 100 than w more.
 
 ranking_interval = {[175 275]};
 
@@ -60,28 +90,35 @@ svm_test_set_idx = 3;
 random_seed = 10; % for reproducibility 
 rArrayLocs = {'te'};
 % rArrayLocs = {'anterior', 'middle', 'posterior'};
-rSessionsByMonk = {[7 9], [6 7]};  % (Fig 2B / 2D)
-% rSessionsByMonk = {1:9, 1:7};
-% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};  % Fig 2C
+rSessionsByMonk = {[7 9], [6 7]};  % (Fig 4A / 4B)
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};  % Fig 4C
+% rSessionsByMonk = {[], 1:7};  % tmp hotfix to just run max
+% rSessionsByMonk = {[1 2 3 5 6 7 9], [1 2 6 7]};  % Fig 4C with matched num trials (base 3-5 of Max have super low trial counts)
+% rSessionsByMonk = {[10 11 12], [8 9 10]};  % Fig ??, cat/dog sessions bookending the car/truck training
+
+% rSessionsByMonk = {[], [4 5]};  % car/truck learning
+% rSessionsByMonk = {1:7, 1:5};  % car/truck baselines
+
+matchedTrialNumPrePost = true; % if true, match num trials (per catg) used in the classifier pre/post training
+fraction_min_num_trials = 0.85;  % what fraction of the min number of trials to use for each classifier (otherwise you get no error bars for the session with the minimum number)
+
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
-runShuffle = false; % run the shuffled condition?
-    nShuffles = 5;
+runShuffle = false; % run the shuffled condition? need to run it for the timecourse clustering stats
+    nShuffles = 20;
     
 manuallyReduceIntervals = true; % test a subset of all the intervals for faster testing
 %     manualIntervals = {[75 175], [175 275]}; % NB, also need to change variable fname_base to grab file containing desired intervals
-%     manualIntervals = {[175 275]}; % NB, also need to change variable fname_base to grab file containing desired intervals
+    manualIntervals = {[175 275]}; % NB, also need to change variable fname_base to grab file containing desired intervals
+    X_fname_base = sprintf('%%s_allNeurons_variableBin_1.mat'); % contains 75-175, 175-225, 175-275, and 175-350.
     
-    % for SVM timecourses (Fig 2B)
-    starts = -100:10:300;
-    manualIntervals = arrayfun(@(x) [x x+100], starts, 'UniformOutput', false);
-    ranking_interval = {[175 275]};  % interval to rank units wrt one-D SVM's
+    % for SVM timecourses
+%     starts = -100:10:300;
+%     step = 5; % Interval parameters (for loading the correct spike counts file)
+%     width = 100;
+%     manualIntervals = arrayfun(@(x) [x x+100], starts, 'UniformOutput', false);
+%     ranking_interval = {[175 275]};  % interval to rank units wrt one-D SVM's
+%     X_fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % contains full time-course of spike counts 
 
-% path to spike counts. See pv_get_interval_spike_counts if you want to add
-% more intervals.
-step = 5; % Interval parameters (for loading the correct spike counts file)
-width = 100;
-X_fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % contains full time-course of spike counts (Fig 2b)
-% X_fname_base = sprintf('%%s_allNeurons_variableBin_1.mat'); % contains 75-175, 175-225, 175-275, and 175-350.
 
 % Note that folds are not generated purely randomly -- we impose
 % constraints about not re-using the same image in train vs test ("abstract
@@ -90,12 +127,30 @@ X_fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % contain
 kfold_num = 5; % k-fold cross validation. 
 
 % Other Parameters
-spikeCountPath = 'XMA2/Spike_count_mats';
 TE_LOCS = {'anterior', 'middle', 'posterior'};
 catg2_ind1 = 261;
 
+%% Count total num appearances of each image
 
-%% Load GLM data
+for m = 1:length(Monkeys)
+    img_counts = [];
+    rSessions = rSessionsByMonk{m};
+    for i = 1:length(rSessions)
+        sessn = rSessions(i);
+        if contains(Monkeys(m).Sessions(sessn).ShortName, "UNI")
+            continue
+        end
+        img_counts = [Monkeys(m).Sessions(sessn).CueInfo.NumApp];
+        disp(img_counts(1:10))
+        fprintf("Monkey %s, session %s, %0.2f +/- %0.2f pres / img \n", ...
+            Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName, ...
+            mean(img_counts), std(img_counts))
+    
+    end
+    
+end
+
+%% XXX Load GLM data
 
 % Load record
 
@@ -129,7 +184,8 @@ paramStruct = struct('RandomSeed', random_seed,...
     'IntervalsUsed', {ints_used},....
     'TrainingImgSet', img_set_names{svm_train_set_idx},...
     'TestingImgSet', img_set_names{svm_test_set_idx},...
-    'NumBestUnits', {num_best_units_to_use});
+    'NumBestUnits', {num_best_units_to_use},...
+    'MatchedTrialNumPrePost', matchedTrialNumPrePost);
 
 %% Record of ID nums so far
 
@@ -154,18 +210,53 @@ paramStruct = struct('RandomSeed', random_seed,...
 % about it.
 
 % ID: 198063 -- ^^, but also has analysis where we remove the best units
-% one at a time. (Fig 2D)
+% one at a time.
 
 % ID: 921995 -- full timecourse (step=10 ms), shuff x5, pre/post, [10 25 50
-% 100] unit subsets. (Fig 2B)
+% 100] unit subsets. (Fig 4A)
 
 % ID: 316514 -- all sessions, [10 25 50 100], {[175 275]}, no shuffle. (Fig
-% 2C)
+% 4B)
 
 % ID: 723146 -- full timecourse for separate arrays (pre/post, 100 best
-% units). (Supp fig 3)
+% units).
 
 % ID: 257183 -- same as above (723146) but with shuffles.
+
+
+% *** trial num matched for revisions below here ***
+
+% ID: 331368 all sessions, [100] best units, 175-275, no shuff, matched
+% num cats/dogs. (for Fig 4C)
+
+% ID: 291617 -- same as above ^, but with 240/240 images.
+
+% ID: 994359 -- pre/post, [100] best units, full timecourse, no shuff, matched
+% nums. For Fig 4A.
+
+% ID: 297691 --same as above ^, but with 20x shuffles.
+
+% ID: 66973 -- same as above ^, but with 240/240 images.
+
+% XXXX ID: 812755 -- same as above, but with 20x shuffles and 240/240.
+
+% ID: 958258 -- pre/post, [100] best units, full timecourse, arrays with
+% shuffle.
+
+% ID: 760531 -- pre/post 1:100 best units, matched nums. Fig 4E
+
+% ID: 163919 -- cat/dog sessions that bookend the car/truck training.
+% Similar to Fig 4A, [100] best units, 175-275, matched num trials. Odd
+% results — Marta's decoding acc falls to zero?
+
+% ===============
+% CARTRUCK data
+% ID: 326003 -- car/truck PF's. Marta post (#7) is bad due to array damage, it seems.
+
+% ID: 643100 -- car/truck PF's with baselines days, matched num trials.
+
+% ID: 377431 -- car/truck timecourse, pre/post, matched, shuffle.
+% ===============
 
 % Load record
 fullRecordPath = fullfile(EXT_HD, svmRecordPath);
@@ -173,7 +264,7 @@ load(fullRecordPath, 'Record');
 
 %% (skip this if analyzing anew) Find desired SVM data
 
-ID = 224797;
+ID = 812755;
 
 fNames = fields(Record);
 row = find([Record.ID] == ID);
@@ -198,13 +289,22 @@ end
 % ID = 198063;
 % ID = 224797;
 
-% ID = 921995;  % Fig 2B (timecourse)
-% ID = 316514;  % Fig 2C (all sessions)
-% ID = 198063;  % Fig 2D (adding units)
+% ID = 921995;  % Fig 4A (timecourse)
+% ID = 316514;  % Fig 4B (all sessions)
+% ID = 198063;  % Fig 4C (adding units)
+% ID = 257183; % full timecourse for separate arrays (pre/post, 100 best units).
 
-% ID = 257183; % full timecourse for separate arrays (pre/post, 100 best units). (Supp fig 3)
+% revisions
+ID = 291617; % 240/240
+% ID = 207437;
+% ID = 994359;  % timecourse
+% ID = 331368;  % Fig 4B (all sessions), matched
+% ID = 760531;  % increasing num units
+% ID = 958258;  % timecourse w array shuffles
 
-ID = 921995;
+
+% ID = 326003;  % car-truck, not matched tr nums
+% ID = 643100;  % car-truck, baseline + matched
 
 load(sprintf(fullSVMPath, ID), 'data');
 SVM = data;
@@ -309,12 +409,20 @@ end
 
 %% (run once, then save output) Calculate single-unit SVM performance
 
+% does not match num trials across sessions, since doesn't matter for
+% ranking within a session.
+
 for m = 1:length(Monkeys)
     rng(random_seed)
     rSessions = rSessionsByMonk{m};
     
     for i = 1:length(rSessions)
         sessn = rSessions(i);
+
+         % TMP hotfix:
+%         if ~isempty(SVM(m).Sessions(sessn).UnitInfo)
+%             continue
+%         end
 
         % Get data from appropriate storage place
         % X_full is (trials) x (units) x (intervals)
@@ -428,7 +536,8 @@ end
 
 %% Rank units based on single-unit SVM performance
 
-rArrayLocs = {'anterior', 'middle', 'posterior', 'te'};
+% rArrayLocs = {'anterior', 'middle', 'posterior',};
+% rArrayLocs = {'te'};
 
 % Monkeys(m).Sessions(i).GLM_coeffs is (num units) x (num intervals used)
 for m = 1:length(Monkeys)
@@ -490,21 +599,36 @@ end
 
 % To rank by single single-unit SVMs
 ranking_field_name = 'Ranking_SingleUnitSVM_KFL';
-output_field_name_template = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d';
+
+if ~matchedTrialNumPrePost
+    output_field_name_template = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d';
+elseif matchedTrialNumPrePost
+%     output_field_name_template = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d_TrNMatch';
+    output_field_name_template = 'KFL_SUnSVMRk_sprs_T_%d_TrNMch';  % had to shorten for individ arrays and shuffles lol
+end
 
 % svm_solver = {'sgd', 'sparsa'};
-svm_solver = {'sparsa'};
-
-% To rank by GLM coeff
-% ranking_field_name = 'Ranking_GLM_coeff';
-% output_field_name_template = 'KFL_GLMRanking_Top_%d';
-
-runShuffle = true; % run the shuffled condition? obv will slow things down ~(nShuffles)-fold!
-nShuffles = 5;
+% svm_solver = {'sparsa'};
+svm_solver = 'sparsa';
 
 for m = 1:length(Monkeys)
     rng(random_seed)
     rSessions = rSessionsByMonk{m};
+    
+    % Calculate num trials to use if matching
+    if matchedTrialNumPrePost
+        num_trials_per_catg_to_use = inf;
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            Y = SVM(m).Sessions(sessn).Session_Y_catg;
+            min_catg_presentations = min([sum(Y==1) sum(Y==2)]);
+            if min_catg_presentations < num_trials_per_catg_to_use
+                num_trials_per_catg_to_use = min_catg_presentations;
+            end
+        end
+        num_trials_per_catg_to_use = round(fraction_min_num_trials * num_trials_per_catg_to_use * (kfold_num-1)/kfold_num);
+    end
+    
     
     for i = 1:length(rSessions)
         sessn = rSessions(i);
@@ -539,6 +663,12 @@ for m = 1:length(Monkeys)
                     if length(unit_subset) > length(SVM(m).Sessions(sessn).UnitInfo)
                         continue
                     end
+                    
+                    % TMP hotfix
+%                     kflID = get_good_interval_name2(interval, array, sprintf(output_field_name_template, num_best_units_to_use(iUnitSubset)));
+%                     if ~isempty(SVM(m).Sessions(sessn).(kflID))
+%                         continue
+%                     end
                     
                     units_to_use = find(ismember(rankings, unit_subset));
                     
@@ -581,6 +711,19 @@ for m = 1:length(Monkeys)
                             % Which trials to use as training, based on the
                             % imgs.
                             idx = ismember(imgs_shown, trainingImgs); 
+                            
+                            % Further match total number of cat/dog images
+                            % if requested.
+                            if matchedTrialNumPrePost
+                                cat_inds = find(ismember(imgs_shown, trainingImgs) & (Y_subset == 1));
+                                dog_inds = find(ismember(imgs_shown, trainingImgs) & (Y_subset == 2));
+                                cat_inds_to_keep = randsample(cat_inds, num_trials_per_catg_to_use);
+                                dog_inds_to_keep = randsample(dog_inds, num_trials_per_catg_to_use);
+                                idx(cat_inds(~ismember(cat_inds, cat_inds_to_keep))) = 0;
+                                idx(dog_inds(~ismember(dog_inds, dog_inds_to_keep))) = 0;
+                                assert(sum(Y_subset(idx)==1) == sum(Y_subset(idx)==2))
+                            end
+%                             disp(sum(Y_subset(idx)==1))
 
                             % Run the model.
                             model = fitclinear(X_subset(idx,:),...
@@ -642,6 +785,7 @@ for m = 1:length(Monkeys)
                     % Store data.
                     kflID = get_good_interval_name2(interval, array, sprintf(output_field_name_template, num_best_units_to_use(iUnitSubset)));
                     SVM(m).Sessions(sessn).(kflID) = kflValues;
+%                     disp(mean(kflValues))
                     if runShuffle
                         % needed to write "SHUFF" instead here for some
                         % versions because output exceeded the max field
@@ -658,20 +802,17 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% Plot performance wrt adding units (Fig 2D)
+%% Plot performance wrt adding units (Fig 4E)
 
 array = 'te';
 rArrayLocs = {'te'};
 
 % base_kfl_name = 'KFL_GLMRanking_Top_%d';
 % base_kfl_name = 'KFL_SingleUnitSVMRanking_Top_%d';
-base_kfl_name = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d';  % 2D
+% base_kfl_name = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d';  % 2D
+% base_kfl_name = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d_TrNMatch';  % Fig 4E
+base_kfl_name = 'KFL_SUnSVMRk_sprs_T_%d_TrNMch';
 
-fig_path = '/Users/jonahpearl/Documents/BJR group/Catdog paper/Feb 2023 addtl figs';
-
-num_best_units_to_use = [1:1:50 52:2:200];
-
-% intervals_to_plot = {[170 270]};  % timecourse
 intervals_to_plot = {[175 275]};
 
 for m = 1:length(Monkeys)
@@ -691,7 +832,7 @@ for m = 1:length(Monkeys)
             
             for i = 1:length(rSessions)
                 sessn = rSessions(i);
-                disp(sessn)
+%                 disp(sessn)
                 
                 for iUnitSubset = 1:length(num_best_units_to_use)
                     unit_subset = 1:(num_best_units_to_use(iUnitSubset));
@@ -701,7 +842,7 @@ for m = 1:length(Monkeys)
                         continue
                     end
                     kfls = SVM(m).Sessions(sessn).(kflID); 
-                    disp(kfls)
+%                     disp(kfls)
 
                     means(i, iUnitSubset) = mean(1 - kfls);
                     stds (i, iUnitSubset) = std(1 - kfls);
@@ -728,14 +869,6 @@ end
 % looks like the data are bi-sigmoidal lol. We'll see if i can verify this
 % rigorously but first let's figure out curve fitting...
 
-% array = 'te';
-rArrayLocs = {'te'};
-
-% base_kfl_name = 'KFL_GLMRanking_Top_%d';
-% base_kfl_name  = 'KFL_SingleUnitSVMRanking_Top_%d';  
-base_kfl_name = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d'; % Fig 2D
-fig_path = '/Users/jonahpearl/Documents/BJR group/Catdog paper/Feb 2023 addtl figs';
-
 % ok this is totally contrived and the fit is very finicky wrt init 
 % conditions, let's just do a single sigmoid.
 % bisigmoid = fittype('a1/(1 + exp(-b1*(x-c1))) + a2/(1 + exp(-b2*(x-c2))) + d',...
@@ -746,9 +879,10 @@ sigmoid = fittype('a1/(1 + exp(-b1*(x-c1))) + d',...
     'dependent', 'y', 'independent', 'x',...
     'coefficients', {'a1', 'b1', 'c1', 'd'});
 
-manualIntervals = {[175 275]};
-rSessionsByMonk = {[7 9], [6 7]};  % (Fig 2B / 2D)
-lower_n_units_val_by_monk = [3 2];
+% manualIntervals = {[175 275]};
+% rSessionsByMonk = {[7 9], [6 7]};  
+ylims_by_monk = {[0.6 0.8], [0.54, 0.65]};
+lower_n_units_val_by_monk = [3 3];
 
 for m = 1:length(Monkeys)
     rng(random_seed)
@@ -800,7 +934,7 @@ for m = 1:length(Monkeys)
             excluded_xvals_lower = log10(num_best_units_to_use(idx_excluded_lower));
             excluded_means = all_means(:, idx_excluded_lower);
             
-            figure
+            figure("Position", [400 400 360 300])
             hold on
             yl = [0.48 max(means(:)+stds(:))+0.02];
             
@@ -830,7 +964,7 @@ for m = 1:length(Monkeys)
 %                 errorbar(xvals, means(i,:), stds(i,:),...
 %                     'DisplayName', Monkeys(m).Sessions(rSessions(i)).ShortName,...
 %                     'Color', mlc(i))
-                scatter(xvals, means(i,:), 20, mlc(i), 'filled', ...
+                scatter(xvals, means(i,:), 10, mlc(i), 'filled', ...
                     'DisplayName', Monkeys(m).Sessions(rSessions(i)).ShortName)
                 
                 % Show single excluded value (n= 2 units) for Marta
@@ -852,9 +986,13 @@ for m = 1:length(Monkeys)
                         round(midpoint_slope_mean,3),...
                         round(f.d, 3))
             end
+%             axis equal
             set(gca, 'XScale', 'log')
-            xlabel('Log10 num best units used')
+            xlabel('Num best units used')
             ylabel('Accuracy')
+            ylim(ylims_by_monk{m})
+            xticks(log10([3 10 25 100]))
+            xticklabels([3 10 25 100])
             title(sprintf('%s, interval %d - %d', Monkeys(m).Name, interval(1), interval(2)), 'Interpreter', 'none')
 %             legend
             formatSVMPlot(gca, gcf, 16)
@@ -862,7 +1000,7 @@ for m = 1:length(Monkeys)
             % Compare pre/post coeff conf ints
             n_coeffs = 5;
             coeff_names = {'Amp', 'Shape', 'Midpoint', 'Intercept', 'Midpt Slope'};
-            figure
+            figure("Position", [700 700 600 150])
             for iCoeff = 1:n_coeffs
                 subplot(1,n_coeffs,iCoeff)
                 hold on
@@ -874,6 +1012,8 @@ for m = 1:length(Monkeys)
                 errorbar(1, post_mean, post_int(1) - post_mean, post_int(2) - post_mean, 'color', mlc(2), 'LineWidth', 2)
                 title(coeff_names{iCoeff})
                 formatSVMPlot(gca, gcf, 16)
+                xlim([-0.5, 1.5])
+                xticks([])
             end
             sgtitle(sprintf('%s, interval %d - %d', Monkeys(m).Name, interval(1), interval(2)), 'Interpreter', 'none')
             
@@ -881,13 +1021,13 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% (before plotting timecourse, ie Fig 2B) Run cluster-based permutation statistics for a given neural subset (ie num units = 50) (fast) (shuffle vs real, pre vs post)
+%% (before plotting timecourse) Run cluster-based permutation statistics for a given neural subset (ie num units = 50) (fast) (shuffle vs real, pre vs post)
 % See: https://www.nature.com/articles/s41593-018-0148-7, "Cluster-based
 % permutation procedure" in methods section.
 
 % This section of code automatically looks at shuffled data -- do not 
 % include in list of locs.
-rArrayLocs_stats = {'te'};
+% rArrayLocs_stats = {'te'};
 % rArrayLocs_stats = {'anterior', 'middle', 'posterior'};
 top_n_units = 100;
 
@@ -895,21 +1035,23 @@ top_n_units = 100;
 cluster_alpha = 0.05;
 
 
-kfl_base_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);
+% kfl_base_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);
+kfl_base_name = sprintf('KFL_SUnSVMRk_sprs_T_%d_TrNMch', top_n_units);  % for individ arrays
 
 % 1. run ttests at each time point
 % 2. Generate clusters and cluster statistics (real and shuffled)
 % 3. Compare ranked statistics from shuffle to real to find pvals (mult
 % comp correction)
 
-for m = 1:length(Monkeys)
+% for m = 1:length(Monkeys)
+for m = 2
     rSessions = rSessionsByMonk{m};
     if numel(rSessions) ~= 2
         error('Shuffle permutations code expects two sessions to compare. \n Were you trying to do a line plot of one interval across days? See below.')
     end
     
-    for iLoc = 1:length(rArrayLocs_stats)
-        loc = rArrayLocs_stats{iLoc};
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
 
         % Get list of real tstats
         tStats = getrealtstats(SVM, m, rSessions, loc, manualIntervals, kfl_base_name); % 1 x num intervals
@@ -952,6 +1094,7 @@ for m = 1:length(Monkeys)
             true_val = clusterStats(iRank);
             shuffled_vals = clusterStats_SHUFFLED(iRank,:);  % 1 x nshuffles
             pval = (sum(true_val <= shuffled_vals) / numel(shuffled_vals));
+            fprintf("clust %d, pval %0.4g \n", iRank, pval)
             signf = (pval < (cluster_alpha / (length(clusterStats)*2)));
             if signf
                 signf_clusters = [signf_clusters iRank];
@@ -971,15 +1114,16 @@ end
 
 %% (before same) Check when timecourse first signf above shuffle
 above_chance_alpha = 0.05;
-kfl_base_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);
+% kfl_base_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);
+kfl_base_name = sprintf('KFL_SUnSVMRk_sprs_T_%d_TrNMch', top_n_units);  % for individ arrays
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     
     for i = 1:length(rSessions)
         session = rSessions(i);
-        for iLoc = 1:length(rArrayLocs_stats)
-            loc = rArrayLocs_stats{iLoc};
+        for iLoc = 1:length(rArrayLocs)
+            loc = rArrayLocs{iLoc};
 
             pvals = zeros(length(manualIntervals),1);
             for iInt = 1:length(manualIntervals)
@@ -1015,17 +1159,19 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% Plot timecourse for a given neural subset (Fig 2B)
+%% Plot timecourse for a given neural subset (Fig 4A/B)
 
 % Plotting params
 plot_alpha = 0.4; % transparency of sem fill
-mkYLims = {[0.45 0.85], [0.45 0.65]};
+% mkYLims = {[0.45 0.85], [0.45 0.65]};
+mkYLims = {[0.47 0.8], [0.47 0.8]};
 
-rArrayLocs = {'te'};
+% rArrayLocs = {'te'};
 % rArrayLocs = {'anterior', 'middle', 'posterior'};
 
 top_n_units = 100;  % top 100 for fig 2B
-base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
+% base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
+base_kfl_name = sprintf('KFL_SUnSVMRk_sprs_T_%d_TrNMch', top_n_units);  % for individ arrays
 
 figure2('Position', [400 400 1000 600])
 % tiledlayout(length(Monkeys), length(rArrayLocs))
@@ -1123,6 +1269,11 @@ for m = 1:length(Monkeys)
             
             % Make graphs have the same y-axes within each monkey
             ylim(mkYLims{m})
+            yticks([0.5 0.65 0.8])
+            xlim([-100 300])
+%             if m == 1
+%                 yticks([0.5 0.8])
+%             end
             
             % Detailed labels if desired
             %             ylabel('SVM abcat accuracy (mean +/- SEM)')
@@ -1141,16 +1292,20 @@ for m = 1:length(Monkeys)
 %     saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%g', Monkeys(m).Name, sigID, ID)), 'epsc')
 end
 
-%% Plot a given subset/interval over sessions (Fig 2C)
+%% Plot a given subset/interval over sessions (Fig 4C)
 
-rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};  % Fig 2C
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};  % Fig 4C
+
 top_n_units = 100;
 interval_to_plot = [175 275];
-base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
-
+% base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
+base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d_TrNMatch', top_n_units);
+% base_kfl_name = sprintf('KFL_SUnSVMRk_sprs_T_%d_TrNMch', top_n_units);
 
 figure2('Position', [400 400 1000 600])
-mkYLims = {[0.675 0.8], [0.57 0.63]};
+% mkYLims = {[0.5 0.8], [0.5 0.65]};  % fig 4B, bottom at 0.5
+% mkYLims = {[0.65 0.8], [0.57 0.63]};  % fig 4B, tight lims
+mkYLims = {[0.5 0.75], [0.5 0.7]};  % car truck
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -1199,6 +1354,7 @@ for m = 1:length(Monkeys)
 %             'LineWidth', 2, 'Color', mlc(iLoc),...
 %             'DisplayName', loc)
 
+        disp(accMeans(:, iLoc))
         bar(accMeans(:, iLoc))
         errorbar(accMeans(:, iLoc), accSems(:,iLoc), 'o',...
             'LineWidth', 2, 'Color', 'k',...
@@ -1206,9 +1362,10 @@ for m = 1:length(Monkeys)
         
 
         % Add labels
-%         xticks(1:length(Monkeys(m).Sessions(rSessions)))
-%         xticklabels({Monkeys(m).Sessions(rSessions).ShortName})
-%         xtickangle(90)
+        xticks(1:length(Monkeys(m).Sessions(rSessions)))
+        xticklabels({Monkeys(m).Sessions(rSessions).ShortName})
+        xtickangle(90)
+        ylabel("Cross-val. SVM accuracy")
 
         % Make graphs have the same y-axes within each monkey
         ylim(mkYLims{m})
@@ -1534,7 +1691,7 @@ output_field_name_template = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d';
 svm_solver = {'sparsa'};
 
 rArrayLocs = {'anterior', 'middle', 'posterior'};
-rSessionsByMonk = {[7 9], [6 7]};  % (Fig 2B / 2D)
+rSessionsByMonk = {[7 9], [6 7]};
 
 runShuffle = false; % run the shuffled condition? obv will slow things down ~(nShuffles)-fold!
 nShuffles = 5;
@@ -1700,7 +1857,8 @@ mkYLims = {[0.45 0.85], [0.45 0.65]};
 
 rArrayLocs = {'anterior', 'middle', 'posterior'};
 top_n_units = 100;  % top 100 for fig 2B
-base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
+% base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
+base_kfl_name = sprintf('KFL_SUnSVMRk_sprs_T_%d_TrNMch', top_n_units);  % for individ arrays
 
 % f = figure2('Position', [400 400 1000 600])
 figure('Position', [400 400 500 300])
@@ -1765,10 +1923,23 @@ for m = 1:length(Monkeys)
                 'HandleVisibility', 'off');
             
             % Plot signf inds
-            sigID = sprintf('ClustPermSignfInds_%s_Sessions_%d_vs_%d_Top%d', loc, rSessions(1), rSessions(2), top_n_units);
+            % Plot signf inds
+            sigID2 = sprintf('ClustPermSignfInds_byClust_%s_Sessions_%d_vs_%d_Top%d', loc, rSessions(1), rSessions(2), top_n_units);
             try 
-                if ~ isempty(Monkeys(m).(sigID))
-                    plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+%                 if ~ isempty(Monkeys(m).(sigID))
+%                     plot(starts(Monkeys(m).(sigID)), mkYLims{m}(2)-0.02, 'ko', 'MarkerFaceColor', 'k')
+%                 end
+                if ~isempty(Monkeys(m).(sigID2))
+                    % Do some shenanigans to create well-spaced grayscale
+                    % colors for the different t-test clusters
+                    nclust = length(Monkeys(m).(sigID2));
+                    grays = gray(10);
+                    color_idxs = round(linspace(0,10,nclust+1))+1;
+                    for iClust = 1:nclust
+                        plot(starts(Monkeys(m).(sigID2){iClust}), mkYLims{m}(2)-0.02,...
+                            'ko', 'MarkerFaceColor', grays(color_idxs(iClust), :),...
+                            'MarkerEdgeColor', 'none')
+                    end
                 end
             catch
                 warning('No field found for cluster permutation statistics')
@@ -1800,8 +1971,6 @@ for m = 1:length(Monkeys)
 %     pause(0.5)
 %     saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%g', Monkeys(m).Name, sigID, ID)), 'epsc')
 end
-
-
 
 %% =============== %%
 %% Save the data

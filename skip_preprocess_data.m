@@ -154,4 +154,9 @@ end
 
 %% Save data
 save(fullfile(EXT_HD, skip_path, 'MaxMarta_skip_preProcessed.mat'), 'Monkeys')
+% save(fullfile(EXT_HD, skip_path,
+% 'MaxMarta_skip_preProcessed_ALL_TEST_TRIALS.mat'), 'Monkeys')  % contains
+% all trials for the test day, not just trial unique (ie contains first,
+% second, third...presentations for stimuli)
+
 

@@ -62,27 +62,30 @@ for m = 1:length(Monkeys)
         fixn_err_idx = find([Monkeys(m).Sessions(sessn).TrialInfo.Fixn_err] == 1 & ...
             cellfun(@(v) sum(~isnan(v))>0, {Monkeys(m).Sessions(sessn).TrialInfo.Cues_seen}));
         
-        % TODO: refactor this so it just steps forward from each fixn err
-        % trial, and finds the next completed trial, if any. Then we can add info
-        % like "imgs that were seen on fe tr" to the completed trial, and
-        % also distinguish between trials that directly followed FE's vs
-        % those that "indirectly" followed, ie likely had some time in
-        % between
+        % TODO: try w ignoring "fe interludes"
         
         % Find completed trials directly following those trials
-        following_comp_idx = fixn_err_idx + 1;
-        following_comp_idx = following_comp_idx(following_comp_idx <= length(Monkeys(m).Sessions(sessn).TrialInfo));
-        following_comp_idx = following_comp_idx([Monkeys(m).Sessions(sessn).TrialInfo(following_comp_idx).Completed]==1);
         [Monkeys(m).Sessions(sessn).TrialInfo.Directly_follows_FE] = deal(0);
-        [Monkeys(m).Sessions(sessn).TrialInfo(following_comp_idx).Directly_follows_FE] = deal(1);
-        
+        [Monkeys(m).Sessions(sessn).TrialInfo.Imgs_seen_on_prev_FE] = deal(0);
+        for iFe = 1:length(fixn_err_idx)
+            idx = fixn_err_idx(iFe);
+            following_completed_idx = idx + 1;
+            if (following_completed_idx > length(Monkeys(m).Sessions(sessn).TrialInfo) || ...
+                    Monkeys(m).Sessions(sessn).TrialInfo(following_completed_idx).Completed ~= 1)
+                continue
+            else
+                Monkeys(m).Sessions(sessn).TrialInfo(following_completed_idx).Directly_follows_FE = 1;
+                Monkeys(m).Sessions(sessn).TrialInfo(following_completed_idx).Imgs_seen_on_prev_FE = Monkeys(m).Sessions(sessn).TrialInfo(idx).Cues_seen;
+            end
+        end
     end
 end
 
 %% Get mean/std per image/unit combo
 
 % takes ~2 minutes
-intervals_to_test = {[75 175], [175 275]};
+% intervals_to_test = {[75 175], [175 275]};
+intervals_to_test = {[175 275]};
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -93,61 +96,173 @@ for m = 1:length(Monkeys)
         % Find trials of interest
         fe_bool = [Monkeys(m).Sessions(sessn).TrialInfo.Fixn_err] == 1;
         post_fe_bool = [Monkeys(m).Sessions(sessn).TrialInfo.Directly_follows_FE] == 1;
-        other_bool = ([Monkeys(m).Sessions(sessn).TrialInfo.Directly_follows_FE] == 0) & ...
+        baseline_bool = ([Monkeys(m).Sessions(sessn).TrialInfo.Directly_follows_FE] == 0) & ...
             ([Monkeys(m).Sessions(sessn).TrialInfo.Fixn_err] == 0) & ... 
             ([Monkeys(m).Sessions(sessn).TrialInfo.Completed] == 1);
         
         % Get long lists of paired imgs/times for use later
-        % TODO: need to filter this by images that were actually seen in
-        % the corresponding fixn err trial (b/c eg sometimes only the 1st
-        % of 5 imgs are actually seen, so we would only expect suppression
-        % in that one img).
-        all_post_fe_imgs = [Monkeys(m).Sessions(sessn).TrialInfo(post_fe_bool).Cues_seen];
-        all_post_fe_img_times = [Monkeys(m).Sessions(sessn).TrialInfo(post_fe_bool).Cue_times];
+        all_post_fe_imgs = [];
+        all_post_fe_img_times = [];
+        post_fe_idx = find(post_fe_bool==1);
+        for iTr = 1:length(post_fe_idx)
+            cues_seen = Monkeys(m).Sessions(sessn).TrialInfo(post_fe_idx(iTr)).Cues_seen;
+            times = Monkeys(m).Sessions(sessn).TrialInfo(post_fe_idx(iTr)).Cue_times;
+            n_cues_on_fe = length(Monkeys(m).Sessions(sessn).TrialInfo(post_fe_idx(iTr)).Imgs_seen_on_prev_FE);
+            all_post_fe_imgs = [all_post_fe_imgs cues_seen(1:n_cues_on_fe)];
+            all_post_fe_img_times = [all_post_fe_img_times times(1:n_cues_on_fe)];
+        end
         
-        all_other_imgs = [Monkeys(m).Sessions(sessn).TrialInfo(other_bool).Cues_seen];
-        all_other_img_times = [Monkeys(m).Sessions(sessn).TrialInfo(other_bool).Cue_times];
+        assert(length(all_post_fe_imgs) == length(all_post_fe_img_times))
+        
+        all_other_imgs = [Monkeys(m).Sessions(sessn).TrialInfo(baseline_bool).Cues_seen];
+        all_other_img_times = [Monkeys(m).Sessions(sessn).TrialInfo(baseline_bool).Cue_times];
         
         % Only bother looking at images that were seen on post-fe trs
-        imgs_seen_on_post_fe_trs = unique([Monkeys(m).Sessions(sessn).TrialInfo(post_fe_bool).Cues_seen]);
-        imgs_seen_on_post_fe_trs = imgs_seen_on_post_fe_trs(imgs_seen_on_post_fe_trs ~= 0);
+        imgs_seen_on_post_fe_trs = unique(all_post_fe_imgs);
         
         for iInterval = 1:length(intervals_to_test)
             interval = intervals_to_test{iInterval};
             
             % pre-allocate matrix for the data
-            response_mat = zeros(length(imgs_seen_on_post_fe_trs), length(Monkeys(m).Sessions(sessn).UnitInfo)); % imgs x units x z-score
+            baseline_mean_responses = zeros(length(imgs_seen_on_post_fe_trs), length(Monkeys(m).Sessions(sessn).UnitInfo)); % imgs x units x z-score
+            postfe_mean_responses = zeros(length(imgs_seen_on_post_fe_trs), length(Monkeys(m).Sessions(sessn).UnitInfo)); % imgs x units x z-score
         
+            baseline_all_responses = [];
+            postfe_all_responses = [];
+            
             for iImg = 1:length(imgs_seen_on_post_fe_trs)
                 img = imgs_seen_on_post_fe_trs(iImg);
 
                 % Find times when this image was seen either normally, or
                 % specifically after a fixation error.
                 post_fe_on_times = all_post_fe_img_times(all_post_fe_imgs == img);
-                other_on_times = all_other_img_times(all_other_imgs == img);
+                baseline_on_times = all_other_img_times(all_other_imgs == img);
 
                 for iUnit = 1:length(Monkeys(m).Sessions(sessn).UnitInfo)
+                    
+                    if strcmp(Monkeys(m).Sessions(sessn).UnitInfo(iUnit).Location, "teo")
+                        baseline_mean_responses(iImg, iUnit) = NaN;
+                        postfe_mean_responses(iImg, iUnit) = NaN;
+                        continue
+                    end
                     
                     % Get all spike times for this unit
                     allspike_times = sort(Monkeys(m).Sessions(sessn).UnitInfo(iUnit).Spike_times);
                     
                     % Get this unit's spike counts for these times
-                    other_scs = arrayfun(@(t) spikeCountInInterval(allspike_times, t, interval), other_on_times);
+                    baseline_scs = arrayfun(@(t) spikeCountInInterval(allspike_times, t, interval), baseline_on_times);
                     post_fe_scs = arrayfun(@(t) spikeCountInInterval(allspike_times, t, interval), post_fe_on_times);
                     
                     % Z-score wrt the normal presentations
-                    mu = mean(other_scs);
-                    sig = std(other_scs);
-                    z = mean((post_fe_scs - mu)/sig);
+                    mu = mean(baseline_scs);
+                    sig = std(baseline_scs);
+                    z_post_fe = mean((post_fe_scs - mu)/sig);
+                    z_baseline = mean((baseline_scs - mu)/sig);
                     
                     % Store the data
-                    response_mat(iImg, iUnit) = z;
+                    postfe_mean_responses(iImg, iUnit) = z_post_fe;
+                    baseline_mean_responses(iImg, iUnit) = z_baseline;
+                    
+                    baseline_all_responses = [baseline_all_responses (baseline_scs - mu)/sig];
+                    postfe_all_responses = [postfe_all_responses (post_fe_scs - mu)/sig];
                 end
             end
             
             id = get_good_interval_name2(interval, "", "Post_FE_response_supp_mat");
-            Monkeys(m).Sessions(sessn).(id) = response_mat;
+            Monkeys(m).Sessions(sessn).(id) = postfe_mean_responses;
+            
+            id = get_good_interval_name2(interval, "", "Post_FE_response_supp_all");
+            Monkeys(m).Sessions(sessn).(id) = postfe_all_responses;
+            
+            id = get_good_interval_name2(interval, "", "Baseline_response_supp_mat");
+            Monkeys(m).Sessions(sessn).(id) = baseline_mean_responses;
+            
+            id = get_good_interval_name2(interval, "", "Baseline_response_supp_all");
+            Monkeys(m).Sessions(sessn).(id) = baseline_all_responses;
+            
             fprintf("Done with %s, session %d, interval %d to %d \n", Monkeys(m).Name, sessn, interval(1), interval(2));
+        end
+    end
+end
+
+%% Plot results pre vs post
+
+intervals_to_test = {[175 275]};
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    
+    figure
+    hold on
+    for iInterval = 1:length(intervals_to_test)
+        interval = intervals_to_test{iInterval};
+
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+
+            % pre-allocate matrix for the data
+            id = get_good_interval_name2(interval, "", "Post_FE_response_supp_all");
+            postfe_mean_responses = Monkeys(m).Sessions(sessn).(id);
+            postfe_mean_responses = postfe_mean_responses(~isnan(postfe_mean_responses) & ~isinf(postfe_mean_responses));
+            histogram(postfe_mean_responses, 'BinEdges', -4:0.1:6, 'Normalization', 'probability')
+            xlabel("Responses on post-FE trials (Z per image/unit pair)")
+            ylabel("Probability")
+            title(Monkeys(m).Name, "Interpreter", "none")
+        end
+        legend(["Pre", "Post"])
+        
+        pre = Monkeys(m).Sessions(rSessions(1)).(id)(:);
+        post = Monkeys(m).Sessions(rSessions(2)).(id)(:);
+        pre = pre(~isnan(pre) & ~isinf(pre));
+        post = post(~isnan(post) & ~isinf(post));
+%         [p, h] = ranksum(pre, post)  % ranksum is super sensitive to the long tails
+
+        disp([mean(pre); mean(post)])
+        [h, p] = ttest2(pre, post)
+    end
+end
+
+%% Plot results baseline vs post fe, within sessions
+
+intervals_to_test = {[175 275]};
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    
+    figure
+    hold on
+    
+    for iInterval = 1:length(intervals_to_test)
+        interval = intervals_to_test{iInterval};
+
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            
+            subplot(2,1,i)
+            hold on
+            
+            % get data
+            id = get_good_interval_name2(interval, "", "Post_FE_response_supp_all");
+            postfe_mean_responses = Monkeys(m).Sessions(sessn).(id);
+            postfe_mean_responses = postfe_mean_responses(~isnan(postfe_mean_responses) & ~isinf(postfe_mean_responses));
+            
+            id = get_good_interval_name2(interval, "", "Baseline_response_supp_all");
+            baseline_mean_responses = Monkeys(m).Sessions(sessn).(id);
+            baseline_mean_responses = baseline_mean_responses(~isnan(baseline_mean_responses) & ~isinf(baseline_mean_responses));
+            
+            % plot
+            histogram(postfe_mean_responses, 'BinEdges', -4:0.1:6, 'Normalization', 'probability')
+            histogram(baseline_mean_responses, 'BinEdges', -4:0.1:6, 'Normalization', 'probability')
+            
+            xlabel("Responses on post-FE trials (Z per image/unit pair)")
+            ylabel("Probability")
+            title(sprintf("Monk %s, %s", Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName), "Interpreter", "none")
+            legend(["Post-FE", "Typical"])
+            set(gca, "YScale", "log")
+            
+            fprintf("Monkey %s, %s", Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName);
+%             [p, h] = ranksum(postfe_mean_responses, baseline_mean_responses)
+            [h, p] = ttest2(postfe_mean_responses, baseline_mean_responses)
         end
     end
 end

@@ -1,5 +1,6 @@
 % run SVMs on each interval of data from the passive viewing tasks
 
+% DEPRECATED -- see pv_SVM_neuralSubsets
 %% Load data
 clearvars
 close all
@@ -39,19 +40,21 @@ load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior
 random_seed = 10; % for reproducibility 
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; % relevant subsets
 rArrayLocs = {'te'};
-rSessionsByMonk = {[7 9], [6 7]};
+% rSessionsByMonk = {[7 9], [6 7]};
 % rSessionsByMonk = {1:9, 1:7};
+rSessionsByMonk = {[10 11 12], [8 9 10]};  % Fig ??, cat/dog sessions bookending the car/truck training
+
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
-runShuffle = true; % run the shuffled condition?
+runShuffle = false; % run the shuffled condition?
     nShuffles = 5;
-matchInputSizes = true; % make input matrices all same size (control) ?
+matchInputSizes = false; % make input matrices all same size (control) ?
     % These parameters only used if matching input sizes. If false, these
     % parameters are automatically set to NaN, NaN, and 1.
     proportion_of_min_pop_size = 0.75; 
     proportion_of_min_trials = 0.75;
     nRandomSubsamples = 50;
-manuallyReduceIntervals = false; % test a subset of all the intervals for faster testing
-    manualIntervals = {[175 275] [175 350]};
+manuallyReduceIntervals = true; % test a subset of all the intervals for faster testing
+    manualIntervals = {[175 275]};
 kfold_num = 5; % k-fold cross validation. 
 % Note that folds are not generated purely randomly -- we impose
 % constraints about not re-using the same image in train vs test ("abstract
@@ -255,7 +258,8 @@ for m = 1:length(Monkeys)
                         idx = ismember(imgID_Subset, trainingImgs); 
                         
                         % Run the model.
-                        model = fitclinear(X_subset(idx,:), Y_subset(idx),'Regularization', 'lasso');
+                        model = fitclinear(X_subset(idx,:), Y_subset(idx), ...
+                            'Regularization', 'lasso');
                         
                         % Get prediction error.
                         preds = predict(model, X_subset(~idx,:));

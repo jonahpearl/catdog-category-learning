@@ -1,5 +1,9 @@
 % plot SVM timecourse results
 
+
+% Don't use this anymore -- use pv_SVM_neuralSubsets to account for the bug
+% in MATLAB's SVM function.
+
 %% Params and load SVM record
 clearvars
 close all
@@ -40,7 +44,7 @@ cluster_alpha = 0.05;
     % low trial counts, and it drags down the decoding accuracy for the
     % other four.
     
-ID = 93591; % all locs, no matching, no shuffle, all days, all ints. Supp
+% ID = 93591; % all locs, no matching, no shuffle, all days, all ints. Supp
 % fig 4, accuracy across time.
 
 % ID = 467637; % Variable bin sizes! all locs, no matching, no shuffle, all days.
@@ -54,6 +58,11 @@ ID = 93591; % all locs, no matching, no shuffle, all days, all ints. Supp
 % ID = 339824; % image subset analysis: train on 20, test on 240, all locs / days
 % ID = 436650; % image subset analysis: train on 20, test on 20, all locs / days
 
+% ID = 997956; % sub 01-03, trying to debug Marta's seeming drop to chance
+% levels.
+% ID = 582726; % ditto but using sparsa solver just for kicks.
+
+%% Show record info
 fNames = fields(Record);
 row = find([Record.ID] == ID);
 for f = 1:length(fNames)
@@ -93,15 +102,16 @@ end
 
 % Choose sessions.
 % rSessionsByMonk = {[7 9] [6 7]}; % Fig 2!
-rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
+% rSessionsByMonk = {[1 2 3 5 6 7 9], 1:7};
 % rSessionsByMonk = {[1 6 7 9], [1 5 6 7]};
+rSessionsByMonk = {[10 11 12], [8 9 10]};  % Fig ??, cat/dog sessions bookending the car/truck training
 
 % Choose arrays. Treat shuffle as a separate loc, will be easier.
-% rArrayLocs = {'te', 'SHUFFLE_te'}; 
-% rArrayLocs = {'te'};
+% rArrayLocs = {'te', 'SHUFFLE_te'};  % Fig 2!
+rArrayLocs = {'te'};
 % rArrayLocs = {'te', 'anterior', 'middle', 'posterior', 'SHUFFLE_te', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'};
 % rArrayLocs = {'anterior', 'middle', 'posterior', 'SHUFFLE_anterior', 'SHUFFLE_middle', 'SHUFFLE_posterior'}; 
-rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
+% rArrayLocs = {'te', 'anterior', 'middle', 'posterior'}; 
 % rArrayLocs = {'anterior', 'middle', 'posterior'}; 
      
 %% Run cluster-based permutation statistics (shuffle vs real, pre vs post)
@@ -119,7 +129,7 @@ rArrayLocs_stats = {'te'};
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
     if numel(rSessions) ~= 2
-        error('Shuffle permutations code expects two sessions to compare')
+        error('Shuffle permutations code expects two sessions to compare. \n Were you trying to do a line plot of one interval across days? See below.')
     end
     
     for iLoc = 1:length(rArrayLocs_stats)
@@ -173,6 +183,7 @@ end
 plot_alpha = 0.4; % transparency of sem fill
 mkYLims = {[0.45 0.85], [0.45 0.65]};
 
+figure
 % figure2('Position', [400 400 1000 600])
 % tiledlayout(length(Monkeys), length(rArrayLocs))
 for m = 1:length(Monkeys)
@@ -183,8 +194,9 @@ for m = 1:length(Monkeys)
     accSems = zeros(length(rSessions), length(rIntervals), length(rArrayLocs));
     
     % Prepare figure
-    figure2('Position', [400 400 1000 600])
-%     subplot(2,1,m)
+%     figure2('Position', [400 400 1000 600])
+    subplot(2,1,m)
+    hold on
     
     for iLoc = 1:length(rArrayLocs)
         loc = rArrayLocs{iLoc};
@@ -192,16 +204,16 @@ for m = 1:length(Monkeys)
         % New subplot for each array location
 %         subplot(2, ceil(length(rArrayLocs)/2), iLoc)
 %         nexttile
-        hold on
+%         hold on
 
         % Big TE with smaller arrays underneath
-        if strcmp(loc, 'te')
-            subplot(2, 3,[1 2 3])
-            hold on
-        else
-            subplot(2,3,iLoc+2)
-            hold on
-        end
+%         if strcmp(loc, 'te')
+%             subplot(2, 3,[1 2 3])
+%             hold on
+%         else
+%             subplot(2,3,iLoc+2)
+%             hold on
+%         end
         
         for i = 1:length(rSessions)
             sessn = rSessions(i);
@@ -288,9 +300,11 @@ singleInterval = [175 275];
 % Prepare figure
 % figure2('Position', [2200 1300 250 630])
 % figure2('Position', [2200 1300 400 1200])
-figure2('Position', [2200 1300 0.75*600 0.75*1200])
+figure('Position', [2200 1300 0.75*600 0.75*1200])
 % figure
 hold on
+
+rArrayLocs = {'te'};
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};

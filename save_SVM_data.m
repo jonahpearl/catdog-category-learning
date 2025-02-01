@@ -5,7 +5,12 @@ function save_SVM_data(data, paramStruct, svmPath, recordMatPath)
 
 
 % Load in record of all prev saved data
-load(recordMatPath, 'Record');
+if exist(recordMatPath)
+    load(recordMatPath, 'Record');
+else
+    Record = struct();
+    Record(1).ID = 0;
+end
 
 % Get all field names.
 fields = fieldnames(paramStruct);
@@ -67,4 +72,6 @@ save(recordMatPath, 'Record');
 % Finally, save the data.
 save(sprintf(svmPath, id), 'data');
     
+disp(id)
+
 end

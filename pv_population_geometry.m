@@ -165,16 +165,16 @@ for m = 1:length(Monkeys)
                     % Call signature: MD = mahal(test samples, reference samples)
                     
                     % Within cats
-                    MD_within_cats = [MD_within_cats; mahal(X_test(Y_test == 1, :), X_train(Y_train == 1, :))];
+                    MD_within_cats = [MD_within_cats; sqrt(mahal(X_test(Y_test == 1, :), X_train(Y_train == 1, :)))];
                     
                     % Within dogs
-                    MD_within_dogs =[MD_within_dogs; mahal(X_test(Y_test == 2, :), X_train(Y_train == 2, :))];
+                    MD_within_dogs =[MD_within_dogs; sqrt(mahal(X_test(Y_test == 2, :), X_train(Y_train == 2, :)))];
                     
                     % Cats wrt dogs
-                    MD_cats_wrt_dogs = [MD_cats_wrt_dogs; mahal(X_test(Y_test == 1, :), X_train(Y_train == 2, :))];
+                    MD_cats_wrt_dogs = [MD_cats_wrt_dogs; sqrt(mahal(X_test(Y_test == 1, :), X_train(Y_train == 2, :)))];
                     
                     % Dogs wrt cats
-                    MD_dogs_wrt_cats = [MD_dogs_wrt_cats; mahal(X_test(Y_test == 2, :), X_train(Y_train == 1, :))];
+                    MD_dogs_wrt_cats = [MD_dogs_wrt_cats; sqrt(mahal(X_test(Y_test == 2, :), X_train(Y_train == 1, :)))];
                     
                 end
                 
@@ -195,7 +195,16 @@ for m = 1:length(Monkeys)
     end
 end
 
+
 %% Plot mahalnobis results
+
+f1 = figure('Position', [500, 700, 265, 400]);
+hold on
+
+f2 = figure('Position', [200, 300, 265, 400]);
+hold on
+
+outlier_MD_bounds = [5 25];
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -207,9 +216,6 @@ for m = 1:length(Monkeys)
         
         for iInt = 1:length(manualIntervals)
             interval = manualIntervals{iInt};
-            
-            figure('Position', [500, 700, 550, 250])
-            hold on
 
             for i = 1:length(rSessions)
                 sessn = rSessions(i);
@@ -217,59 +223,63 @@ for m = 1:length(Monkeys)
                 within_cats_id = get_good_interval_name2(interval, array, "MD_within_cats");
                 MD_within_cats = GEO(m).Sessions(sessn).(within_cats_id);
                 MD_within_cats = MD_within_cats(~isnan(MD_within_cats));
+                MD_within_cats = MD_within_cats((MD_within_cats > outlier_MD_bounds(1)) & (MD_within_cats  < outlier_MD_bounds(2)));
                 
                 within_dogs_id = get_good_interval_name2(interval, array, "MD_within_dogs");
                 MD_within_dogs= GEO(m).Sessions(sessn).(within_dogs_id);
                 MD_within_dogs = MD_within_dogs(~isnan(MD_within_dogs));
+                MD_within_dogs = MD_within_dogs((MD_within_dogs > outlier_MD_bounds(1)) & (MD_within_dogs  < outlier_MD_bounds(2)));
                 
                 id = get_good_interval_name2(interval, array, "MD_cats_wrt_dogs");
-                MD_cats_wrt_dogs= GEO(m).Sessions(sessn).(id);
+                MD_cats_wrt_dogs = GEO(m).Sessions(sessn).(id);
                 MD_cats_wrt_dogs = MD_cats_wrt_dogs(~isnan(MD_cats_wrt_dogs));
+                MD_cats_wrt_dogs = MD_cats_wrt_dogs((MD_cats_wrt_dogs > outlier_MD_bounds(1)) & (MD_cats_wrt_dogs < outlier_MD_bounds(2)));
                 
                 id = get_good_interval_name2(interval, array, "MD_dogs_wrt_cats");
-                MD_dogs_wrt_cats= GEO(m).Sessions(sessn).(id);
+                MD_dogs_wrt_cats = GEO(m).Sessions(sessn).(id);
                 MD_dogs_wrt_cats = MD_dogs_wrt_cats(~isnan(MD_dogs_wrt_cats));
+                MD_dogs_wrt_cats = MD_dogs_wrt_cats((MD_dogs_wrt_cats > outlier_MD_bounds(1)) & (MD_dogs_wrt_cats < outlier_MD_bounds(2)));
                 
 %                 disp(size(MD_within_dogs))
                 
-                subplot(1,2,1)
+                % Plot within catg dists in f1
+                figure(f1)
+                subplot(2,1,m)
                 hold on
                 errorbar(i, mean(MD_within_cats), std(MD_within_cats)/sqrt(length(MD_within_cats)),...
                     "o", 'LineWidth', 2, 'Color', 'r') 
                 errorbar(i+0.25, mean(MD_within_dogs), std(MD_within_dogs)/sqrt(length(MD_within_dogs)),...
                     "o", 'LineWidth', 2, 'Color', 'b')
                 
-                subplot(1,2,2)
-                hold on
-                errorbar(i, mean(MD_cats_wrt_dogs), std(MD_cats_wrt_dogs)/sqrt(length(MD_cats_wrt_dogs)),...
-                    "o", 'LineWidth', 2, 'Color', 'r') 
-                errorbar(i+0.25, mean(MD_dogs_wrt_cats), std(MD_dogs_wrt_cats)/sqrt(length(MD_dogs_wrt_cats)),...
-                    "o", 'LineWidth', 2, 'Color', 'b') 
+                % Plot within vs betw in f2
+                all_within = [MD_within_dogs; MD_within_cats];
+                all_betw = [MD_cats_wrt_dogs; MD_dogs_wrt_cats];
+                GEO(m).Sessions(sessn).Mahal_within_vs_betw = {all_within, all_betw};
                 
+                figure(f2)
+                subplot(2,1,m)
+                hold on
+                errorbar(i, mean(all_within), std(all_within)/sqrt(length(all_within)),...
+                    "o", 'LineWidth', 2, 'Color', 'k') 
+                errorbar(i+0.25, mean(all_betw), std(all_betw)/sqrt(length(all_betw)),...
+                    "o", 'LineWidth', 2, 'Color', [0.5, 0.5, 0.5])
             end
             
-            ax1 = subplot(1,2,1);
-%             legend(["Cat", "Dog"])
-            title("Within categories")
+            figure(f1)
+%             title("Cat vs dog")
             xlim([0.5, 2.5])
-%             formatSVMPlot(gca, gcf);
-            
-            ax2 = subplot(1,2,2);
-%             legend(["Catgs wrt dogs", "Dogs wrt cats"]) 
-            title("Across categories") 
-            xlim([0.5, 2.5])
-%             formatSVMPlot(gca, gcf);
-            
-            sgtitle(sprintf("Monk %s, interval %d to %d", Monkeys(m).Name, interval(1), interval(2)), 'Interpreter', 'none')
+            formatSVMPlot(gca, gcf);
             xlabel("Session")
-            ylabel("Mahalanobis dist.")
+            ylabel("Mahal dist.")
             
-%             linkaxes([ax1, ax2])
-%             if m == 1
-%                 ylim([125, 155])
-%             elseif m == 2
-%                 ylim([170, 180])  
-%             end
+            figure(f2)
+%             title("Within vs across")
+            formatSVMPlot(gca, gcf);
+            xlabel("Session")
+            ylabel("Mahal dist.")
+            xlim([0.5, 2.5])
+            
+            
             
             % Do some stats
             [h, p] = ttest2(GEO(m).Sessions(rSessions(1)).(within_cats_id), ...
@@ -287,6 +297,20 @@ for m = 1:length(Monkeys)
             [h, p] = ttest2(GEO(m).Sessions(rSessions(1)).(within_dogs_id), ...
                             GEO(m).Sessions(rSessions(2)).(within_dogs_id));
             fprintf("Monkey %s, dog pre vs dog post: p = %0.4g \n", Monkeys(m).Name, p)
+            
+            [h, p] = ttest2(GEO(m).Sessions(rSessions(1)).Mahal_within_vs_betw{1}, ...
+                            GEO(m).Sessions(rSessions(1)).Mahal_within_vs_betw{2});
+            fprintf("Monkey %s, within vs betw PRE: p = %0.4g \n", Monkeys(m).Name, p)
+            
+            [h, p] = ttest2(GEO(m).Sessions(rSessions(2)).Mahal_within_vs_betw{1}, ...
+                            GEO(m).Sessions(rSessions(2)).Mahal_within_vs_betw{2});
+            fprintf("Monkey %s, within vs betw POST: p = %0.4g \n", Monkeys(m).Name, p)
+            
+%             [h, p] = ttest2(GEO(m).Sessions(rSessions(1)).Mahal_within_vs_betw{1}, ...
+%                             GEO(m).Sessions(rSessions(2)).Mahal_within_vs_betw{2});
+%             fprintf("Monkey %s, within, PRE: p = %0.4g \n", Monkeys(m).Name, p)
+            
+            
              
         end
         
@@ -294,7 +318,7 @@ for m = 1:length(Monkeys)
 end
 
 
-%% Pairewise dist metrics take 2
+%% Pairewise dist metrics take 2 (random unit subset folds)
 
 n_folds = 5;
 fraction_min_n_units = 0.5;  % want to use the same num neurons pre vs. post, so we will grab some fraction of the minimum
@@ -344,7 +368,7 @@ for m = 1:length(Monkeys)
         
             for iInt = 1:length(manualIntervals)
                 interval = manualIntervals{iInt};
-                fprintf("Monkey %s, session %d, int %d \n", Monkeys(m).Name, i, iInt)
+                fprintf("Monkey %s, session %s, int %d \n", Monkeys(m).Name, Monkeys(m).Sessions(sessn).ShortName, iInt)
 
                 % Find index in X's 3rd dim for requested interval
                 int_idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
@@ -364,6 +388,8 @@ for m = 1:length(Monkeys)
                 
                 MD_within_dogs = [];
                 all_dog_img_pair_inds = [];
+                
+                MD_betw_catgs = [];
                 
 %                 MD_cats_wrt_dogs = [];
 %                 MD_dogs_wrt_cats = [];
@@ -394,6 +420,9 @@ for m = 1:length(Monkeys)
                             X_train = X_subset(idx, units_to_use);
                             Y_train = Y(idx);
 
+                            % Some combos of units give poorly conditioned
+                            % covariance matrices, try randomly until we
+                            % find one that will calculate successfully.
 %                             disp(cond(X_train(Y_train==1, :)))
                             condition_num = cond(X_train(Y_train==1, :));
                             if condition_num > 300
@@ -403,6 +432,7 @@ for m = 1:length(Monkeys)
                             end
                             
                             % Get the pairwise dists
+                            all_dists = squareform(pdist(X_train, 'mahalanobis'));
                             cat_dists = squareform(pdist(X_train(Y_train==1, :), 'mahalanobis'));
                             dog_dists = squareform(pdist(X_train(Y_train==2, :), 'mahalanobis'));
                             
@@ -414,10 +444,12 @@ for m = 1:length(Monkeys)
                     end
 
                     % Ensure the only zeros are on the diagonal
+                    assert(sum(sum(all_dists == 0)) == size(all_dists,1))
                     assert(sum(sum(cat_dists == 0)) == size(cat_dists,1))
                     assert(sum(sum(dog_dists == 0)) == size(dog_dists,1))
 
                     % Filter out by stimulus
+                    dists_betw_catgs = all_dists(1:catg2_ind1, catg2_ind1:end);
                     dists_within_cats = upperTriuVals(cat_dists);
                     dists_within_dogs = upperTriuVals(dog_dists);
                     
@@ -443,8 +475,13 @@ for m = 1:length(Monkeys)
                     
                     MD_within_dogs = [MD_within_dogs; dists_within_dogs];
                     all_dog_img_pair_inds = [all_dog_img_pair_inds; dog_img_pair_inds];
+                    
+                    MD_betw_catgs = [MD_betw_catgs(:); dists_betw_catgs(:)];
 
                 end
+                id = get_good_interval_name2(interval, array, "m_pairwise_dists_betw_catgs");
+                GEO(m).Sessions(sessn).(id) = MD_betw_catgs;
+                
                 id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_cats");
                 GEO(m).Sessions(sessn).(id) = MD_within_cats;
                 
@@ -461,8 +498,14 @@ for m = 1:length(Monkeys)
     end
 end
 
+%% Plot pairwise dist results, within catg
 
-%% Plot pairwise dist results
+figure("Position", [500 500 1200 800])
+hold on
+
+xlim_by_monk = {[6 20], [7, 22]};
+% outlier_MD_bounds = [5 25];
+outlier_MD_bounds = [0 50];
 
 for m = 1:length(Monkeys)
     rSessions = rSessionsByMonk{m};
@@ -474,28 +517,40 @@ for m = 1:length(Monkeys)
         for iInt = 1:length(manualIntervals)
             interval = manualIntervals{iInt};
             
-            figure
-            hold on
-
             variances = zeros(2, 2);  % sessions x categories
+            no_outlier_variances = zeros(2,2);
             for i = 1:length(rSessions)
                 sessn = rSessions(i);
                 
-                id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_cats");
-                m_dists_within_cats = GEO(m).Sessions(sessn).(id);
+                cat_id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_cats");
+                m_dists_within_cats = GEO(m).Sessions(sessn).(cat_id);
                 variances(i, 1) = var(m_dists_within_cats);
+                cat_mask = (m_dists_within_cats > outlier_MD_bounds(1)) & (m_dists_within_cats < outlier_MD_bounds(2));
+                no_outlier_variances(i,1) = var(m_dists_within_cats(cat_mask));
                 
-                id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_dogs");
-                m_dists_within_dogs = GEO(m).Sessions(sessn).(id);
+                dog_id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_dogs");
+                m_dists_within_dogs = GEO(m).Sessions(sessn).(dog_id);
                 variances(i, 2) = var(m_dists_within_dogs);
+                dog_mask = (m_dists_within_dogs > outlier_MD_bounds(1)) & (m_dists_within_dogs < outlier_MD_bounds(2));
+                no_outlier_variances(i,2) = var(m_dists_within_dogs(dog_mask));
                 
-                % Try removing imgs 307/312 which are outliers in mk 2
-                if m == 2
-                    id = get_good_interval_name2(interval, array, "m_pairwise_dists_img_pairs_within_dogs");
-                    all_dog_img_pair_inds = GEO(m).Sessions(sessn).(id);
-                    outlier_bool = (any((all_dog_img_pair_inds == 312),2) | any((all_dog_img_pair_inds == 307),2));
-                    m_dists_within_dogs = m_dists_within_dogs(~outlier_bool);
+                all_within_dists = [m_dists_within_cats; m_dists_within_dogs];
+                all_within_dists_masked = [m_dists_within_cats(cat_mask); m_dists_within_dogs(dog_mask)];
+                
+                if contains(Monkeys(m).Sessions(sessn).ShortName, "Pre")
+                    pre_within_dists_masked = all_within_dists_masked;
+                elseif contains(Monkeys(m).Sessions(sessn).ShortName, "Post")
+                    post_within_dists_masked = all_within_dists_masked;
                 end
+                
+                % Try removing imgs 307/312 which are outliers in mk 2 -->
+                % makes no diff.
+%                 if m == 2
+%                     id = get_good_interval_name2(interval, array, "m_pairwise_dists_img_pairs_within_dogs");
+%                     all_dog_img_pair_inds = GEO(m).Sessions(sessn).(id);
+%                     outlier_bool = (any((all_dog_img_pair_inds == 312),2) | any((all_dog_img_pair_inds == 307),2));
+%                     m_dists_within_dogs = m_dists_within_dogs(~outlier_bool);
+%                 end
                 
 %                 subplot(1,2,1)
 %                 hold on
@@ -503,29 +558,121 @@ for m = 1:length(Monkeys)
 %                     "o", 'LineWidth', 2, 'Color', mlc(1)) 
 %                 errorbar(i+0.25, mean(m_dists_within_dogs(:)), std(m_dists_within_dogs(:))/sqrt(length(m_dists_within_dogs)),...
 %                     "o", 'LineWidth', 2, 'Color', mlc(2))
-                subplot(2,1,1)
-                hold on
-                histogram(m_dists_within_cats, 'BinEdges', 0:0.5:50)
-                title("Cats")
-                set(gca, 'YScale', 'log')
                 
-                subplot(2,1,2)
+
+                % Plot cats/dogs separately --> they're the same
+%                 subplot(2,1,1)
+%                 hold on
+%                 histogram(m_dists_within_cats, 'BinEdges', 5:0.1:35, 'Normalization', 'probability')
+%                 title("Cats")
+%                 set(gca, 'YScale', 'log')
+%                 
+%                 subplot(2,1,2)
+%                 hold on
+%                 histogram(m_dists_within_dogs, 'BinEdges', 5:0.1:35, 'Normalization', 'probability')
+%                 title("Dogs")
+%                 set(gca, 'YScale', 'log')
+
+                % Concat all pairs
+                subplot(2,1,m)
                 hold on
-                histogram(m_dists_within_dogs, 'BinEdges', 0:0.5:50)
-                title("Dogs")
-                set(gca, 'YScale', 'log')
+%                 linear_bins = 0:0.1:35;
+                linear_bins = 0:0.1:50;
+                histogram(all_within_dists, 'BinEdges', linear_bins, 'Normalization', 'probability', 'FaceColor', mlc(i))
                 
+                % Draw mean + std
+                mu = mean(all_within_dists_masked);
+                sigma = std(all_within_dists_masked);
+                yl = ylim;
+                scatter(mu, yl(2) * 1.1, 100, mlc(i), 'filled', 'v',  'MarkerEdgeColor', 'k')
+                plot([mu-sigma mu+sigma], repelem(yl(2) * 1.1, 2), '-', 'Color', mlc(i), 'LineWidth', 1.5)
+                
+%                 xlim(xlim_by_monk{m})  % to show var redn. on linear-y plots
+                formatSVMPlot(gca, gcf)
             end
             
-            subplot(2,1,1)
-            legend(["Pre", "Post"])
-            sgtitle(sprintf("Monkey %s", Monkeys(m).Name), "Interpreter", "none")
+%             legend(["Pre", "Post"])
+%             title(sprintf("Monkey %s", Monkeys(m).Name), "Interpreter", "none")
+            xlabel("Mahal. dist.")
+            ylabel("Prob.")
+            set(gca, 'YScale', 'log')
+            title("pre vs post")
             
-            disp(variances)
+            
+            [h, p] = vartest2(pre_within_dists_masked, post_within_dists_masked);
+            fprintf("Monkey %s, int %d, vartest pre/within vs post/within: p=%0.4g \n", Monkeys(m).Name, iInt, p)
+            disp([var(pre_within_dists_masked) var(post_within_dists_masked)]);
+            
+            [h, p] = ttest2(pre_within_dists_masked, post_within_dists_masked);
+            fprintf("Monkey %s, int %d, ttest pre/within vs post/within p=%0.4g \n", Monkeys(m).Name, iInt, p)
+            disp([mean(pre_within_dists_masked) mean(post_within_dists_masked)])
+            
+            histcounts_pre = histcounts(pre_within_dists_masked, 'BinEdges', linear_bins, 'Normalization', 'probability');
+            histcounts_post = histcounts(post_within_dists_masked, 'BinEdges', linear_bins, 'Normalization', 'probability');
+            jsd = JSDiv(histcounts_pre, histcounts_post);
+            disp(jsd)
         end
     end
 end
 
+%% Plot pairwise dist results, between vs within catg
+
+xlim_by_monk = {[6 20], [7, 22]};
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    disp(Monkeys(m).Name)
+    
+    figure
+    hold on
+    
+    for iLoc = 1:length(rArrayLocs)
+        array = rArrayLocs{iLoc};
+        
+        for iInt = 1:length(manualIntervals)
+            interval = manualIntervals{iInt};
+            
+            variances = zeros(2, 2);  % sessions x categories
+            no_outlier_variances = zeros(2,2);
+            for i = 1:length(rSessions)
+                sessn = rSessions(i);
+                
+                cat_id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_cats");
+                m_dists_within_cats = GEO(m).Sessions(sessn).(cat_id);
+                
+                dog_id = get_good_interval_name2(interval, array, "m_pairwise_dists_within_dogs");
+                m_dists_within_dogs = GEO(m).Sessions(sessn).(dog_id);
+                
+                betw_id = get_good_interval_name2(interval, array, "m_pairwise_dists_betw_catgs");
+                m_dists_betw_catgs = GEO(m).Sessions(sessn).(betw_id);
+                
+                all_within = [m_dists_within_cats; m_dists_within_dogs];
+                
+                % Concat all pairs
+                subplot(2,1,i)
+                hold on
+                
+%                 linear_bins = 0:0.1:35;
+                linear_bins = 0:0.1:50;
+                histogram(all_within, 'BinEdges', linear_bins, 'Normalization', 'probability')
+                histogram(m_dists_betw_catgs, 'BinEdges', linear_bins, 'Normalization', 'probability')
+                
+                [h, p] = ttest2(all_within, m_dists_betw_catgs);
+                fprintf("Monkey %s, session %d, int %d, ttest within vs betw p=%0.4g \n", Monkeys(m).Name, sessn, iInt, p)
+                disp([mean(all_within), mean(m_dists_betw_catgs)])
+                
+%                 xlim(xlim_by_monk{m})  % to show var redn. on linear-y plots
+                title(sprintf("%s, within vs betw", Monkeys(m).Sessions(sessn).ShortName))
+%                 legend(["Within", "Between"])
+                xlabel("Mahal. dist.")
+                ylabel("Prob.")
+                set(gca, "YScale", "log")
+                
+                formatSVMPlot(gca, gcf)
+            end            
+        end
+    end
+end
 
 %% Inspect where high pairwise dists are coming from
 

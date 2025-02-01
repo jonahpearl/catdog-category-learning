@@ -9,6 +9,8 @@ EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
 CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 pv_path = 'XMA2/Monkey_structs';
 
+ignoreVal = 20;  % ignore neurons w fewer spikes than this
+
 % Load spike data
 Data = load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_ni.mat'));
 [status, Monkeys] = stitch_monkeyStruct_from_parts(Data);
@@ -123,7 +125,7 @@ end
 % test_intervals = {[175 350], [75 175]};
 % baseline_intervals = {[-175 0], [-150 -50]};
 test_intervals = {[175 275]};
-baseline_intervals = {[-150 -50]};
+baseline_intervals = {[-150 -50]};  % why did I use -150 to -50 instead of -100 to 0? just being conservative?
 
 for m = 1:length(Monkeys)
     for i = 1:length(Monkeys(m).Sessions)
@@ -155,6 +157,8 @@ end
 
 %% Get visual responsiveness to each image
 
+rSessionsByMonk = {[7 9], [6 7]};
+
 % test_intervals = {[75 175], [175 275], [275 375], [75 375]};
 % baseline_intervals = {[-150 -50], [-150 -50], [-150 -50], [-250 50]};
 % test_intervals = {[175 350], [75 175]};
@@ -164,9 +168,27 @@ baseline_intervals = {[-150 -50]};
 
 groupings = 1:520; % vis resp for each image (count of this gives rough image-level selectivity)
 
+% kind of weird to do this, but the reviewer requested it.
+matchedTrialNumPrePost = true; % if true, match num trials (per catg) used in the classifier pre/post training
+fraction_min_num_trials = 1.0;  % what fraction of the min number of trials to use for each classifier
 
 for m = 1:length(Monkeys)
-    for i = 1:length(Monkeys(m).Sessions)
+    rSessions = rSessionsByMonk{m};
+    
+    % Find min presentations per image
+    n_pres_per_sessions = zeros(length(rSessions), length(groupings));
+    for i = 1:length(rSessions)
+        sessn = rSessions(i);
+        n_pres_per_sessions(i,:) = arrayfun(@(x) sum(Monkeys(m).Sessions(sessn).Session_Y_imageID == x), groupings);
+    end
+    min_pres_per_image = min(n_pres_per_sessions, [], 1);
+    min_pres_per_image = round(min_pres_per_image * fraction_min_num_trials);
+    
+    assert(all(size(min_pres_per_image)==[1,length(groupings)]));
+    
+    for i = 1:length(rSessions)
+        sessn = rSessions(i);
+        
         for k = 1:length(test_intervals)
             
             % Find the requested spike count fields
@@ -174,11 +196,11 @@ for m = 1:length(Monkeys)
             baseline_int= baseline_intervals{k};
             testID = get_good_interval_name2(test_int, 'full', 'X');
             baseID = get_good_interval_name2(baseline_int, 'full', 'X');
-            testSC = Monkeys(m).Sessions(i).(testID); % test int
-            baselineSC = Monkeys(m).Sessions(i).(baseID); % baseline int
+            testSC = Monkeys(m).Sessions(sessn).(testID); % test int
+            baselineSC = Monkeys(m).Sessions(sessn).(baseID); % baseline int
             
             % Pre-allocate, (num imgs) x (num units)
-            img_vr_mat = zeros(length(groupings), length(Monkeys(m).Sessions(i).UnitInfo));
+            img_vr_mat = zeros(length(groupings), length(Monkeys(m).Sessions(sessn).UnitInfo));
             
             % For each image...
             for p = 1:length(groupings)
@@ -190,10 +212,21 @@ for m = 1:length(Monkeys)
                 fullID = strcat(tid,bid);   
                 
                 % Find relevant trials (trials when that image was shown)
-                idx = find(Monkeys(m).Sessions(i).Session_Y_imageID == p);
+                idx = find(Monkeys(m).Sessions(sessn).Session_Y_imageID == p);
+                
+                % Subset if required
+                if matchedTrialNumPrePost
+                    idx = randsample(idx, min_pres_per_image(p));
+                end
                 
                 % Test each unit on those trials
-                for j = 1:length(Monkeys(m).Sessions(i).UnitInfo)
+                for j = 1:length(Monkeys(m).Sessions(sessn).UnitInfo)
+                    
+                    if strcmp(Monkeys(m).Sessions(sessn).UnitInfo(j).Location, 'teo') || length(Monkeys(m).Sessions(sessn).UnitInfo(j).Spike_times) < ignoreVal
+                        img_vr_mat(p,j) = NaN;
+                        continue
+                    end
+                        
                     [~,img_vr_mat(p,j)] = ttest(baselineSC(idx,j), testSC(idx,j), 'tail', 'left'); 
                     
                     % Old way of non-parametric testing
@@ -204,14 +237,26 @@ for m = 1:length(Monkeys)
             end
             
             % Store results
-            Monkeys(m).Sessions(i).(fullID) = img_vr_mat;
+            Monkeys(m).Sessions(sessn).(fullID) = img_vr_mat;
+            
+            fprintf("Done with Monkey %s, session %d, interval set %d \n", Monkeys(m).Name, i, k)
         end
     end
 end
 
 %% Save data
+
+% Per-image responsiveness
 % fname = 'MaxMarta_VR_img_TTest_v2.mat'; % v2 has 175-275
-fname = 'MaxMarta_VR_img_TTest_jun2021.mat'; % changed ttest2 to ttest (because they're paired!)
+% fname = 'MaxMarta_VR_img_TTest_jun2021.mat'; % changed ttest2 to ttest (because they're paired!)
+
+% Overall vis responsiveness
+% fname = 'MaxMarta_VR_all_TTest_jun2021.mat'; % changed ttest2 to ttest (because they're paired!)
+
+% Per-image repsonsiveness with matched trial numbers pre/post
+% Only 175-275
+fname = 'MaxMarta_VR_img_TTest_TrMatched.mat';
+
 t = whos('Monkeys');
 if t.bytes > 2e9 % split large struct and save all the vars
     [status, vnames] = split_monkeyStruct_in_parts(Monkeys);

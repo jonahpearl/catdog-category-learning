@@ -1,5 +1,6 @@
 % script for various cat/dog KDE diff analyses
 
+% to run the bootstrapping, see: /Volumes/Alex's Mac Backup/Documents/MATLAB/matsumoto/jep_fix_cat_xma2_bootstrapKDEs.m
 %% Load data
 clearvars
 close all
@@ -70,8 +71,8 @@ for m = 1:length(KDE)
 %         KDE(m).XTickLabs= {'Pre', 'Post'};
         KDE(m).Code = 'R';
     elseif strcmp(KDE(m).Name, 'Max_fix_cat_xma2')
-        KDE(m).Sessions_to_use = [1 2 3 4 5 6 7];
-        KDE(m).XTickLabs = {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
+%         KDE(m).Sessions_to_use = [1 2 3 4 5 6 7];
+%         KDE(m).XTickLabs = {'Base 1', 'Base 2', 'Base 3', 'Base 4', 'Base 5', 'Pre', 'Post'};
 %         KDE(m).Sessions_to_use = [1 2 6 7];
 %         KDE(m).XTickLabs = {'Base 1', 'Base 2', 'Pre', 'Post'};
         KDE(m).Sessions_to_use = [6 7];
@@ -80,7 +81,7 @@ for m = 1:length(KDE)
     end
 end
 
-%% Get xvals where true diffs are larger than bootstrapped popn (fixed boundary) 
+%% (do not use) Get xvals where true diffs are larger than bootstrapped popn (fixed boundary) 
 
 pct = 99;
 diffid = sprintf('TrueDiff_BW%d', bw);
@@ -141,6 +142,38 @@ for m = 1:length(KDE)
     end
 end
 
+%% (use this one) Get xvals where true diffs are larger than bootstrapped popn (dynamic boundary) 
+
+pct = 99;
+diffid = sprintf('TrueDiff_BW%d', bw);
+bootid = sprintf('BootstrappedDiffs_BW%d', bw);
+rSessionsByMonk = {[7 9], [6 7]};  % (Fig 2B / 2D)
+rArrayLocs = {'te'};
+
+for m = 1:length(KDE)
+    sessions_to_plot = rSessionsByMonk{m};
+    
+    for i = 1:length(sessions_to_plot)
+        sessn = sessions_to_plot(i);
+%         units_to_plot = 1:length(KDE(m).Sessions(sessn).UnitInfo);
+        units_to_plot = find(ismember({KDE(m).Sessions(sessn).UnitInfo.Location}, {'anterior', 'middle', 'posterior'}));
+        
+        for j = 1:length(units_to_plot)
+            unit = units_to_plot(j);
+            
+            
+            kde_x_vals = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.KDEXVals;
+            true_diffs = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(diffid);
+            boot_diffs = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(bootid);
+            boot_diffs = abs(boot_diffs); % just look at magnitude, not sign
+            percentile_diffs = prctile(boot_diffs, pct, 1); % 1 x (num xvals) vector of the 95th percentile of bootstrapped data
+            exceedid = 'ExceedBD_DynamicBound';
+            KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid) = find(abs(true_diffs) > percentile_diffs); % normalized times in ms where true diffs exceeds bootstrapped diffs
+            
+        end
+    end
+end
+
 %% (Optional) Save data
 save_path = fullfile(EXT_HD, 'XMA2/Monkey_structs/MaxMarta_KDEDiffs_HoldOneOut_results.mat');
 [status, vnames] = split_monkeyStruct_in_parts(KDE);
@@ -160,11 +193,12 @@ clear Data
 %% Plot results as heatmap
 
 area_to_plot = 'te';
-boundary = 'static'; % static or dynamic
+boundary = 'dynamic'; % static or dynamic
 nrows_insert = 3; % size of black line separating arrays
 sort_by = 'after_zero_latency'; % after_zero_latency or duration
 sort_empty_val = 1000; % controls if units with no signf diff go above or below others
 divider_color = [0.9 0.2 0.2 ];
+save_dir = '/Users/jonahpearl/Documents/BJR group/Catdog_paper/Feb_2023_addtl_figs/kde_diff_heatmaps';
 
 for m = 1:length(KDE)
     
@@ -348,12 +382,218 @@ for m = 1:length(KDE)
 %     saveas(gcf, sprintf('pv_KDEs_heatmaps mk%s', KDE(m).Code), 'epsc')
 end
 
+%% Plot results as heatmap (array starts aligned) (Fig 4B)
+
+area_to_plot = 'te';
+boundary = 'dynamic'; % static or dynamic
+nrows_insert = 3; % size of black line separating arrays
+sort_by = 'after_zero_latency'; % after_zero_latency or duration
+sort_empty_val = 1000; % controls if units with no signf diff go above or below others
+divider_color = [0.5 0.5 0.5 ];
+save_dir = '/Users/jonahpearl/Documents/BJR group/Catdog_paper/Feb_2023_addtl_figs/kde_diff_heatmaps';
+
+rArrayLocs = {'anterior', 'middle', 'posterior'};
+
+for m = 1:length(KDE)
+    
+%     if strcmp(KDE(m).Name, 'Marta_fix_cat_xma2')
+% %         sessions_to_plot = [1 2 7 9]; % skip base04 (outlier) and post01 (low trial count)
+%         sessions_to_plot = [1:3 5:9];
+%     elseif strcmp(KDE(m).Name, 'Max_fix_cat_xma2')
+% %         sessions_to_plot = [1 2 6 7]; % This is base 01, base02, pre and post. skip base03,04,05 and sub03 (low trial count)
+%         sessions_to_plot = 1:7;
+%     end
+
+    sessions_to_plot = KDE(m).Sessions_to_use;
+    xticklabs = KDE(m).XTickLabs;
+    
+    
+%     figure2('Position', [400 400 1500 680]) % four cols
+    figure2('Position', [400 400 600 680]) % four cols
+    axes = [];
+    hold on
+    
+    % Get max num units, so that all plots are the same height.
+    num_units_by_array = zeros(length(sessions_to_plot), length(rArrayLocs));
+    for i = 1:length(sessions_to_plot)
+        sessn = sessions_to_plot(i);
+        for iLoc = 1:length(rArrayLocs)
+            loc = rArrayLocs{iLoc};
+            num_units_by_array(i, iLoc) = sum(strcmp({KDE(m).Sessions(sessn).UnitInfo.Location}, loc));
+        end
+    end
+    
+    max_num_units_per_array = reshape(max(num_units_by_array, [], 1), 1, []);
+    num_rows_inserted = 0;
+    
+    for i = 1:length(sessions_to_plot)
+        ax = subplot(1, length(sessions_to_plot), i);
+        axes = [axes ax];
+        hold on
+        sessn = sessions_to_plot(i);
+        kde_x_vals = KDE(m).Sessions(sessn).UnitInfo(1).CueOnAllCues.KDEXVals;
+        
+        % Plotting color and label
+        switch regexp(KDE(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+            case 'Base'
+                col = xtickcolors(1,:);
+            case 'Pre'
+                col = xtickcolors(2,:);
+            case 'Post'
+                col = xtickcolors(3,:);
+        end
+        
+        % Take only te units
+        area_bool = strcmp({KDE(m).Sessions(sessn).UnitInfo.Area}, area_to_plot);
+        units_to_plot = find(area_bool);
+        
+        % Sort units by array
+        array_list = {KDE(m).Sessions(sessn).UnitInfo(area_bool).Location};
+        [array_list, idx] = sort(array_list);
+        units_to_plot = units_to_plot(idx);
+        
+        % Get data (already sorted by array)
+        heatmap_mat = zeros(length(units_to_plot), length(kde_x_vals));
+        for j = 1:length(units_to_plot)
+            unit = units_to_plot(j);
+            switch boundary
+                case 'static'
+                    exceedid = 'ExceedBD_FixedBound';
+                    heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
+                case 'dynamic'
+                    exceedid = 'ExceedBD_DynamicBound';
+                    heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
+                otherwise
+                    error('Unexpected value for boundary')
+            end
+        end
+        
+        % Sort each array's data by requested stat, and put lines between
+        % arrays.
+        uq = unique(array_list); 
+        sorts = cell(3,1);
+        for j = 1:length(uq)
+            
+            % Find units in array
+            unit_inds = find(strcmp(array_list, uq{j}));
+            
+            % Sort
+            full_data = heatmap_mat(unit_inds, :);
+            to_sort = heatmap_mat(unit_inds, 201:end);
+            switch sort_by
+                case 'duration'
+                    durs = zeros(1, size(to_sort,1));
+                    for k = 1:size(to_sort,1)
+                        s = sprintf('%d', to_sort(k,:));
+                        s = textscan(s, '%s', 'delimiter', '0', 'multipleDelimsAsOne',1); % all runs of 1s
+                        s = s{:}; % unpack
+                        if isempty(s)
+                            durs(k) = sort_empty_val;
+                        else
+                            durs(k) = max(cellfun('length', s)); % length of each run
+                        end
+                    end
+                    [~,idx] = sort(durs);
+                    
+                case 'after_zero_latency'
+                    first_one = zeros(1, size(to_sort,1));
+                    for k = 1:size(to_sort,1)
+                        first_one_ind = find(to_sort(k,:)==1,1, 'first');
+                        if isempty(first_one_ind)
+                            first_one(k) = sort_empty_val;
+                        else
+                            first_one(k) = first_one_ind;
+%                             if first_one_ind < 100
+%                                 full_data(k,full_data(k,:)==1) = 0.66;
+%                             end
+                        end
+                    end
+                    [~,idx] = sort(first_one);
+            end
+            idx = flipud(idx);
+            sorts{j} = idx;
+            heatmap_mat(unit_inds, :) = full_data(idx,:);
+            
+            % Find spot for the graphical line between arrays
+            array_end_ind = max(unit_inds);
+            
+            
+            % Add data to show the lines
+            if j ~= length(uq)  % ie skip top array in the fig
+                nrows_insert_real = nrows_insert + (max_num_units_per_array(j) - length(unit_inds));
+                num_rows_inserted = num_rows_inserted + nrows_insert_real;
+                heatmap_mat = insertrows(heatmap_mat, repmat(zeros(1, length(kde_x_vals))+0.5, nrows_insert_real, 1), array_end_ind);
+                array_list = insertrows(array_list', repelem({'NA'}, nrows_insert_real, 1), array_end_ind)';
+            end
+        end
+        
+        % Store array sorts
+        sortid = sprintf('HeatmapSortInds_%s', sort_by);
+        KDE(m).Sessions(sessn).(sortid) = sorts;
+        
+        % Add yticklabels for arrays
+        ytick_spots = zeros(1, length(uq)+1);
+        ytick_labs = cell(1, length(uq)+1);
+        for j = 1:length(uq)
+            unit_inds = find(strcmp(array_list, uq{j}));
+            array_end_ind = max(unit_inds);
+            ytick_spots(j) = round(median(unit_inds));
+            ytick_labs{j} = sprintf('%s. (%d)', strcat(upper(uq{j}(1)), uq{j}(2:3)), numel(unit_inds));
+        end
+        
+        % Set colormap:
+        % 0,    0.5,    1
+        % none  spacer  diff
+        cm = parula(2);
+        cm = [cm(1,:); divider_color; cm(2,:)];
+        colormap(cm);
+        
+        % Plot data
+        imagesc(heatmap_mat)
+        
+%         % Add ytick at top
+%         max_yval = sum(max_num_units_per_array) + num_rows_inserted;
+%         ytick_spots(end) = max_yval;
+%         ytick_labs{end} = num2str(sum(max_num_units_per_array)); % this y-tick will be "wrong" to MATLAB but meaningful to humans
+        
+        % Sort to be ascending so MATLAB is happy
+        [ytick_spots, idx] = sort(ytick_spots);
+        ytick_labs = ytick_labs(idx);
+        
+        % Format plot
+%         title(sprintf('%s', KDE(m).Sessions(sessn).ShortName), 'Color', col)
+%         title(sprintf('%s', KDE(m).Sessions(sessn).ShortName))
+        if i == 1
+            xlabel('Time from cue on (ms)')
+            ylabel('Array (# units)')
+        end
+        linkaxes(axes, 'y');
+        xticks(0:200:700)
+        xticklabels(-200:200:500)
+%         xticks([0 400])
+%         xticklabels([0 400])
+        ylim([0 sum(max_num_units_per_array) + 6])
+        yticks(ytick_spots)
+        yticklabels(ytick_labs)
+        ytickangle(90)
+        set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+            'XMinorTick', 'off', 'YMinorTick', 'off',...
+            'fontsize',26, ...
+            'fontname', 'Helvetica', 'fontweight', 'normal', ...
+            'XColor', 'black', 'YColor', 'black', 'Color', 'none')
+    end
+%     set(gcf, 'Renderer', 'Painters');
+%     set(gcf, 'Color', 'none');
+%     saveas(gcf, fullfile(save_dir, sprintf('pv_KDEs_heatmaps_mk%s.pdf', KDE(m).Code)))
+    
+end
+
 %% Plot avg timecourses (cat/dog diff) with days overlaid (learning)
 
 % Params
 areas_to_plot = {'anterior', 'middle', 'posterior'};
 % areas_to_plot = {'te'};
-boundary = 'static'; % static or dynamic
+% boundary = 'static'; % static or dynamic
 % Not convinced correction is needed in this case.
 % chi_sq_base_alpha = 0.05;
 % chi_sq_alpha = chi_sq_base_alpha / numel(chi_sq_inds);
@@ -484,6 +724,7 @@ for m = 1:length(KDE)
         yl = get(gca, 'YLim');
         for ii = chi_sq_inds
             [h,p] = prop_test([sum(pre(:,ii)) sum(post(:,ii))], [size(pre,1) size(post,1)], false, chi_sq_alpha);
+            fprintf('%s, %s, %d \n', KDE(m).Sessions(sessn).ShortName, area, p)
             if h
                 scatter(ii, yl(2)*0.97, 'ko', 'filled')
             end
@@ -766,7 +1007,7 @@ end
 %% Duration of signf cat/dog diffs (pre/post overlay)
 
 % Parameters
-ranksum_alpha = 0.01;
+ranksum_alpha = 0.05;
 areas_to_plot = {'anterior', 'middle', 'posterior', 'te'};
 figs_path = '/Users/jonahpearl/Documents/BJR group/Catdog paper';
 
@@ -798,7 +1039,14 @@ for a = 1:length(areas_to_plot)
                 unit = units_to_plot(j);
 
                 % Get data
-                exceedid = 'ExceedBD_FixedBound';
+                switch boundary
+                    case 'static'
+                        exceedid = 'ExceedBD_FixedBound';
+                    case 'dynamic'
+                        exceedid = 'ExceedBD_DynamicBound';
+                    otherwise
+                        error('Unexpected value for boundary')
+                end
                 exceed_bd_inds = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid);
                 actual_xvals = KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.KDEXVals;
                 max_val = length(actual_xvals);
@@ -831,7 +1079,7 @@ for a = 1:length(areas_to_plot)
             data(data == 0) = [];
 
             % Plot the data as a histogram        
-            histogram(data, 'BinEdges', [0:20:500 Inf], ... % 500
+            histogram(data, 'BinEdges', [0:25:500 Inf], ... % 500
                 'Normalization', 'probability', ...
                 'DisplayName', KDE(m).Sessions(sessn).ShortName, ...
                 'FaceColor', mlc(i))
@@ -840,9 +1088,9 @@ for a = 1:length(areas_to_plot)
             yl = ylim();
             mu = mean(data);
             sigma = std(data);
-            scatter(mu, yl(2)+0.05, 100, '^', 'MarkerFaceColor', mlc(i))
+            scatter(mu, yl(2)+0.05, 100, '^', 'MarkerFaceColor', mlc(i), 'MarkerEdgeColor', mlc(i))
             plot([mu - sigma, mu+sigma], repelem(yl(2)+0.05,2), ...
-                'LineWidth', 2, 'Color', mlc(i))
+                'LineWidth', 2, 'Color', mlc(i), 'MarkerFaceColor', mlc(i))
             
             % Store the data
             run_id = sprintf('KDE_EBD_Runs_%s', area); 
@@ -856,7 +1104,9 @@ for a = 1:length(areas_to_plot)
 %                 KDE(m).Name, KDE(m).Sessions(sessn).ShortName, area), 'Interpreter', 'none')
             title(sprintf('%s, %s', KDE(m).Name, area), 'interpreter', 'none')
 %             ylim([0 0.3])
-            yticks(0:0.1:0.2)
+            yticks(0:0.2:0.4)
+            xlim([0 450])
+            
     %         legend
             if i == 1 && m == 1
 %                 xlabel('Run lengths of cat/dog significanct differences (ms)')
@@ -1017,4 +1267,145 @@ end
 % Format the plot more
 sgtitle('Session, median +/- iqr')
 set(gcf, 'Color', 'white')
+
+%% (BAD) %% Plot results as heatmap (align arrays across days)
+
+area_to_plot = 'te';
+boundary = 'dynamic'; % static or dynamic
+nrows_insert = 3; % size of black line separating arrays
+sort_by = 'after_zero_latency';  % only this 
+sort_empty_val = 1000; % controls if units with no signf diff go above or below others
+divider_color = [0.9 0.2 0.2 ];
+
+rArrayLocs = {'anterior', 'middle', 'posterior'};
+save_dir = '/Users/jonahpearl/Documents/BJR group/Catdog_paper/Feb_2023_addtl_figs/kde_diff_heatmaps';
+
+for m = 1:length(KDE)
+
+    sessions_to_plot = KDE(m).Sessions_to_use;
+    xticklabs = KDE(m).XTickLabs;
+        
+    tiledlayout(3,2);
+    axes = [];
+    
+    for iLoc = 1:length(rArrayLocs)
+        loc = rArrayLocs{iLoc};
+        
+        yl_by_session = {};
+        
+        for i = 1:length(sessions_to_plot)
+            sessn = sessions_to_plot(i);
+            kde_x_vals = KDE(m).Sessions(sessn).UnitInfo(1).CueOnAllCues.KDEXVals;
+
+            ax = nexttile;
+            axes = [axes ax];
+            
+            % Plotting color and label
+            switch regexp(KDE(m).Sessions(sessn).ShortName, '([^0-9-]*)', 'match', 'once')
+                case 'Base'
+                    col = xtickcolors(1,:);
+                case 'Pre'
+                    col = xtickcolors(2,:);
+                case 'Post'
+                    col = xtickcolors(3,:);
+            end
+        
+            
+            
+            % Take only this array's units
+            loc_bool = strcmp({KDE(m).Sessions(sessn).UnitInfo.Location}, loc);
+            units_to_plot = find(loc_bool);
+        
+            % Get data (already sorted by array)
+            heatmap_mat = zeros(length(units_to_plot), length(kde_x_vals));
+            for j = 1:length(units_to_plot)
+                unit = units_to_plot(j);
+                switch boundary
+                    case 'static'
+                        exceedid = 'ExceedBD_FixedBound';
+                        heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
+                    case 'dynamic'
+                        exceedid = 'ExceedBD_DynamicBound';
+                        heatmap_mat(j, KDE(m).Sessions(sessn).UnitInfo(unit).CueOnAllCues.(exceedid)) = 1;
+                    otherwise
+                        error('Unexpected value for boundary')
+                end
+            end
+            
+            % Sort the rows
+            full_data = heatmap_mat(:, :);
+            to_sort = heatmap_mat(:, 201:end);  % exclude noise before cue onset
+            
+            switch sort_by
+                case 'duration'
+                    durs = zeros(1, size(to_sort,1));
+                    for k = 1:size(to_sort,1)
+                        s = sprintf('%d', to_sort(k,:));
+                        s = textscan(s, '%s', 'delimiter', '0', 'multipleDelimsAsOne',1); % all runs of 1s
+                        s = s{:}; % unpack
+                        if isempty(s)
+                            durs(k) = sort_empty_val;
+                        else
+                            durs(k) = max(cellfun('length', s)); % length of each run
+                        end
+                    end
+                    [~,idx] = sort(durs);
+                case 'after_zero_latency'
+                    first_one = zeros(1, size(to_sort,1));
+                    for k = 1:size(to_sort,1)
+                        first_one_ind = find(to_sort(k,:)==1,1, 'first');
+                        if isempty(first_one_ind)
+                            first_one(k) = sort_empty_val;
+                        else
+                            first_one(k) = first_one_ind;
+                        end
+                    end
+                    [~,idx] = sort(first_one);
+            end
+%             idx = fliplr(idx);
+            heatmap_mat(:, :) = full_data(idx,:); 
+            
+            % Store array sorts
+%             sortid = sprintf('HeatmapSortInds_%s_%s',loc, sort_by);
+%             KDE(m).Sessions(sessn).(sortid) = sorts;
+            
+            % Plot data
+            imagesc(heatmap_mat)
+            
+            xlabel('Time from cue on (ms)')
+            ylabel('Units')
+            yl_by_session = [yl_by_session ylim];
+%             title(sortid, 'Interpreter', 'none')
+            xticks(0:200:700)
+            xticklabels(-200:200:500)
+    %         xticks([0 400])
+    %         xticklabels([0 400])
+            set(gca, 'Box', 'off', 'TickDir', 'out', 'TickLength', [.02 .02], ...
+                'XMinorTick', 'off', 'YMinorTick', 'off',...
+                'fontsize',18, ...
+                'fontname', 'Helvetica', 'fontweight', 'normal', ...
+                'XColor', 'black', 'YColor', 'black')
+            set(gcf, 'Renderer', 'Painters');
+            set(gcf, 'Color', 'white');
+        end
+        
+        % Format y axis
+%         linkaxes(axes, 'y');
+        set(axes, 'YDir', 'normal' )
+        max_yl = max([yl_by_session{1}(2) yl_by_session{2}(2)]);
+        for ax = axes
+            daspect(ax, [350, 40/max_yl, 1])
+        end
+        
+        yticks(axes, [0.5, round(max_yl/2/10)*10, floor(max_yl/10)*10])
+        yticklabels(axes, [0, round(max_yl/2/10)*10, floor(max_yl/10)*10])
+%         pos = f.Position;
+%         f.Position = [pos(1) pos(2) pos(3) fig_yaxis_scale_px_per_unit * max_yl^2];        
+%         display([axes(1).Position, axes(2).Position])
+        
+        % Save the plot
+%         saveas(gcf, fullfile(save_dir, sprintf('pv_KDEs_heatmaps_%s_mk%s.pdf', loc, KDE(m).Code)))
+    
+    end
+end
 

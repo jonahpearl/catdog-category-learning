@@ -13,16 +13,29 @@ pv_path = 'XMA2/Monkey_structs';
 % Load behavioral data
 load(fullfile(EXT_HD, pv_path, 'MaxMarta_xma2_behav_and_metaNI.mat')) % behavior and neural summaries, but w/o spike times
 
+%% Load record if desired
+
+% ID = 633648; % 75-175, 175-275, 275-375
+% ID = 748804; % all days, same 3 ints
+% ID = 224797; % same as above but with GLM coeffs
+
+% ==== revisions ====
+% ID: 21110 -- pre / post, 175-275, matched trial nums. no shuffle.
+
+% to look at what has already been run
+fullRecordPath = fullfile(EXT_HD, glmRecordPath);
+load(fullRecordPath)
+
+
 %% Set parameters
 
 % Model predictors
-include_trial_metadata = true; % include loc in trial and trial num in regression?
+include_trial_metadata = false; % include loc in trial and trial num in regression?
 if include_trial_metadata
     numCoeffRows = 7; % in the model with trial metadata, relevant outputs are in rows 2-7
 else
     numCoeffRows = NaN; % otherwise, it's just intercept and slope, and we want slope, ie row 2
 end
-
 
 % GLM Parameters
 random_seed = 10; % for reproducibility 
@@ -32,10 +45,14 @@ ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
 runShuffle = false; % run the shuffled condition?
     nShuffles = 100;
 
+matchedTrialNumPrePost = true; % if true, match num trials (per catg) used in the classifier pre/post training
+fraction_min_num_trials = 0.95;  % what fraction of the min number of trials to use for each classifier (otherwise you get no error bars for the session with the minimum number)
+
+manual_intervals = {[175 275]};
+
 % Interval parameters
 step = 5;
 width = 100;
-
 
 % Other Parameters
 spikeCountPath = 'XMA2/Spike_count_mats';
@@ -87,6 +104,21 @@ for m = 1:length(Monkeys)
     rng(random_seed)
     rSessions = rSessionsByMonk{m};
     
+   % Calculate num trials to use if matching
+    if matchedTrialNumPrePost
+        num_trials_per_catg_to_use = inf;
+        for i = 1:length(rSessions)
+            sessn = rSessions(i);
+            Y = Monkeys(m).Sessions(sessn).Session_Y_catg;
+            min_catg_presentations = min([sum(Y==1) sum(Y==2)]);
+            if min_catg_presentations < num_trials_per_catg_to_use
+                num_trials_per_catg_to_use = min_catg_presentations;
+            end
+        end
+    end
+    num_trials_per_catg_to_use = round(fraction_min_num_trials * num_trials_per_catg_to_use);
+    disp(num_trials_per_catg_to_use)
+    
     for i = 1:length(rSessions)
         sessn = rSessions(i);
 
@@ -107,22 +139,21 @@ for m = 1:length(Monkeys)
         % Manually reduce intervals tested
         warning('Reducing intervals tested...comment out these lines to run all intervals')
         rIntervals_original = rIntervals; % for finding idx in 3rd dim of X_full
-        rIntervals = {[75 175], [175 275], [275 375]}; % for controlling loops
         
         % Pre-allocate the storage vectors
         if include_trial_metadata
-            pVals = zeros(size(X_full,2), length(rIntervals), numCoeffRows);
-            coeffs = zeros(size(X_full,2), length(rIntervals), numCoeffRows);
+            pVals = zeros(size(X_full,2), length(manual_intervals ), numCoeffRows);
+            coeffs = zeros(size(X_full,2), length(manual_intervals ), numCoeffRows);
         else
-            pVals = zeros(size(X_full,2), length(rIntervals));
-            coeffs = zeros(size(X_full,2), length(rIntervals));
+            pVals = zeros(size(X_full,2), length(manual_intervals ));
+            coeffs = zeros(size(X_full,2), length(manual_intervals ));
         end
         
         if runShuffle && include_trial_metadata
             error('shuffle not implemented for trial metadata yet')
         elseif runShuffle
-            pVals_SHUFFLE = zeros(size(X_full,2), length(rIntervals), nShuffles);
-            coeffs_SHUFF = zeros(size(X_full,2), length(rIntervals));
+            pVals_SHUFFLE = zeros(size(X_full,2), length(manual_intervals ), nShuffles);
+            coeffs_SHUFF = zeros(size(X_full,2), length(manual_intervals ));
         end
                 
         for iUnit = 1:size(X_full,2)
@@ -136,20 +167,33 @@ for m = 1:length(Monkeys)
                 continue
             end
             
-            % Run the GLM analysis
-            for iInt = 1:length(rIntervals)
-                interval = rIntervals{iInt};
-                idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
+            for iInt = 1:length(manual_intervals)
                 
+                % Find the desired interval in the data
+                interval = manual_intervals {iInt};
+                interval_idx = find(cellfun(@(a) all(a == interval), rIntervals_original));
+                
+                % Match num trials across sessions
+                trial_idx = true(length(Y),1);
+                if matchedTrialNumPrePost
+                    cat_inds = find(Y == 1);
+                    dog_inds = find(Y == 2);
+                    cat_inds_to_keep = randsample(cat_inds, num_trials_per_catg_to_use);
+                    dog_inds_to_keep = randsample(dog_inds, num_trials_per_catg_to_use);
+                    trial_idx(cat_inds(~ismember(cat_inds, cat_inds_to_keep))) = 0;
+                    trial_idx(dog_inds(~ismember(dog_inds, dog_inds_to_keep))) = 0;
+                end
+                assert(sum(Y(trial_idx)==1) == sum(Y(trial_idx)==2))
+
                 if include_trial_metadata
-                    t = table(X_full(:, iUnit, idx), loc_in_trial_mat, trial_num_mat, Y,...
+                    t = table(X_full(trial_idx, iUnit, interval_idx), loc_in_trial_mat, trial_num_mat, Y(trial_idx),...
                         'VariableNames', {'spikeCount', 'locInTrial', 'trialNum', 'imgCatg'});
                     formula = 'spikeCount ~ locInTrial * trialNum * imgCatg - locInTrial:trialNum:imgCatg';
                     glm = fitglm(t, formula, 'Distribution', 'poisson');
                     pVals(iUnit, iInt, :) = glm.Coefficients{:,4}; % 4th col is pval
                     coeffs(iUnit, iInt, :) = glm.Coefficients{:,1}; % 1st col is estimate
                 else
-                    t = table(X_full(:, iUnit, idx), Y, ....
+                    t = table(X_full(trial_idx, iUnit, interval_idx), Y(trial_idx), ....
                         'VariableNames', {'spikeCount', 'imgCatg'});
                     glm = fitglm(t, 'spikeCount ~ imgCatg', 'Distribution', 'poisson');
                     pVals(iUnit, iInt) = glm.Coefficients{2,4}; % 2,4 is ind for pval of slope
@@ -157,14 +201,14 @@ for m = 1:length(Monkeys)
                 end
                 
                 % Run with shuffled values if requested
-                if runShuffle
-                    for iShuff = 1:nShuffles
-                        t = table(X_full(:, iUnit), Y(randperm(length(Y))));
-                        glm = fitglm(t, 'SC ~ catg', 'Distribution', 'poisson');
-                        pVals_SHUFFLE(iUnit, iInt, iShuff) = glm.Coefficients{2,4};
-                        coeffs(iUnit, iInt, iShuff) = glm.Coefficients{2,1}; % estimate of slope
-                    end
-                end
+%                 if runShuffle
+%                     for iShuff = 1:nShuffles
+%                         t = table(X_full(:, iUnit), Y(randperm(length(Y))));
+%                         glm = fitglm(t, 'SC ~ catg', 'Distribution', 'poisson');
+%                         pVals_SHUFFLE(iUnit, iInt, iShuff) = glm.Coefficients{2,4};
+%                         coeffs(iUnit, iInt, iShuff) = glm.Coefficients{2,1}; % estimate of slope
+%                     end
+%                 end
             end
             
             % Report progress.
@@ -174,7 +218,7 @@ for m = 1:length(Monkeys)
         % Store data.
         Monkeys(m).Sessions(sessn).GLM_Pvals = pVals;
         Monkeys(m).Sessions(sessn).GLM_coeffs = coeffs;
-        Monkeys(m).Sessions(sessn).GLM_intervals = rIntervals;
+        Monkeys(m).Sessions(sessn).GLM_intervals = manual_intervals;
         
         
         if runShuffle
@@ -197,3 +241,6 @@ fullGLMPath = fullfile(EXT_HD, pv_path, 'GLM_results_%g.mat');
 fullRecordPath = fullfile(EXT_HD, glmRecordPath);
 save_SVM_data(Monkeys, paramStruct, fullGLMPath, fullRecordPath);
 fprintf('File saved \n')
+
+
+

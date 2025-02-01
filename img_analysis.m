@@ -2,7 +2,7 @@
 
 %% Re-load Images struct
 clearvars
-close all
+% close all
 
 % Define paths to data
 EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';

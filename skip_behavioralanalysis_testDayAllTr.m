@@ -6,24 +6,83 @@ close all
 EXT_HD = '/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/';
 CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 skip_path = 'SXMA/Monkey_structs';
-leg_counts = readtable('/Volumes/Alex''s Mac Backup/Documents/MATLAB/matsumoto/Images/leg_count_compiled.csv');
-load(fullfile(EXT_HD, skip_path, 'MaxMarta_skip_preProcessed.mat'), 'Monkeys');
+load(fullfile(EXT_HD, skip_path, 'MaxMarta_skip_preProcessed_ALL_TEST_TRIALS.mat'), 'Monkeys');
 
-%% Count total num appearances of each image
+%% Look at second appearances of cues for Marta (only 14 of them)
 
-for m = 1:length(Monkeys)
-    img_counts = [];
-    for i = 1:length(Monkeys(m).Sessions)
-        if contains(Monkeys(m).Sessions(i).ShortName, "UNI")
-            continue
-        end
-        img_counts = [img_counts; [Monkeys(m).Sessions(i).CueInfo.NumApp]];
-        
+imgs_app_twice = find([Monkeys(1).Sessions(9).CueInfo.NumApp] > 1);
+rts = {};
+figure;
+hold on
+for iImg = 1:length(imgs_app_twice)
+    img = imgs_app_twice(iImg);
+    trials = Monkeys(1).Sessions(9).CueInfo(img).TrialNum;
+    these_rts = zeros(length(trials),1);
+    for iTrial = 1:length(trials)
+        these_rts(iTrial) = Monkeys(1).Sessions(9).TrialInfo(trials(iTrial)).RT;
     end
-    disp(sum(img_counts))
-    fprintf("\n")
+    rts{iImg} = these_rts;
+    plot(these_rts, 'k-o')
+    ylim([0, 1000])
 end
 
+% remove massive outlier
+rts = rts(2:end);
+
+% even then, means ~equal, ttest not even close
+first_pres_rts = cellfun(@(x) x(1), rts);
+second_pres_rts = cellfun(@(x) x(2), rts);
+fprintf('first pres: %d, second pres: %d \n', mean(first_pres_rts), mean(second_pres_rts));
+[h, pval] = ttest2(first_pres_rts, second_pres_rts, 'tail', 'right');
+
+%% Look at 2nd-5th appearances for max test day
+% let's do a little regression
+m = 1;
+i = 9;
+
+% m = 2;
+% i = 4;
+
+all_trials = [];
+all_app_nums = [];
+all_rts = [];
+all_catgs = [];
+all_outcome_codes = [];% TP = 1 (dog), TN = 2 (cat), FP = 3, FN = 4
+
+for iImg = 1:length(Monkeys(m).Sessions(i).CueInfo)
+    these_trials = Monkeys(m).Sessions(i).CueInfo(iImg).TrialNum';
+    all_trials = [all_trials these_trials];
+    all_app_nums = [all_app_nums argsort(argsort(these_trials))];
+    all_rts = [all_rts Monkeys(m).Sessions(i).TrialInfo(these_trials).RT];
+    all_catgs = [all_catgs Monkeys(m).Sessions(i).TrialInfo(these_trials).Catg];
+    all_outcome_codes = [all_outcome_codes Monkeys(m).Sessions(i).TrialInfo(these_trials).OutcomeCode];
+end
+
+% linear reg isn't the right model
+% appearance number vs rt
+% mdl = fitlm(all_app_nums, all_rts);
+% figure
+% hold on
+% scatter(all_app_nums, all_rts)
+% xvals = 1:5;
+% plot(xvals, xvals*mdl.Coefficients{'x1', 'Estimate'} + mdl.Coefficients{'(Intercept)', 'Estimate'});
+% 
+% % trial num vs rt
+% mdl = fitlm(all_trials, all_rts);
+% figure
+% hold on
+% scatter(all_trials, all_rts)
+% xvals = all_trials;
+% plot(xvals, xvals*mdl.Coefficients{'x1', 'Estimate'} + mdl.Coefficients{'(Intercept)', 'Estimate'});
+
+
+X = [all_trials' all_catgs'];
+y = all_rts';
+mdl_tr_num = fitglm(X, y, 'Distribution', 'inverse gaussian');
+
+X = [all_app_nums' all_catgs'];
+y = all_rts';
+mdl_app_num = fitglm(X, y, 'Distribution', 'inverse gaussian');
 
 %% Plot RT for each outcome type over sessions
 % TP = 1
@@ -113,11 +172,11 @@ set(gcf,'color','w');
 % True positive, ie ROG for catg 2, leads to reward. True and
 % false negatives have no effect, just moves to next trial.
 % Outcome numerical code:
-    % TP = 1  (correct dog; reward)
-    % TN = 2  (correct cat)
-    % FP = 3  (cat mislabeled as dog; timeout)
-    % FN = 4  (dog mislabled as cat)
-    % Err = 5 (invalid response, ie early / late)
+    % TP = 1
+    % TN = 2
+    % FP = 3
+    % FN = 4
+    % Err = 5.
     
 % NB: percent correct out of completed trials. Does not count errors.
 
@@ -347,68 +406,6 @@ for m = 1:length(Monkeys)
 %     legend
 end
 set(gcf,'color','w');
-
-%% Relative abundance of n legs for each catg
-
-figure
-hold on
-histogram(leg_counts{1:260, "leg_count"}, "DisplayName", "Cats", "BinEdges", 0:5)
-histogram(leg_counts{261:520, "leg_count"}, "DisplayName", "Dogs", "BinEdges", 0:5)
-legend
-xlabel("Num legs")
-xticks((0:4)+ 0.5)
-xticklabels(0:4)
-ylabel("Image count")
-
-%% Percent correct as function of num legs on test images
-
-sessions_to_plot_by_monk = {[9], [4]};
-figure
-
-for m = 1:length(Monkeys)
-    sessions_to_plot = sessions_to_plot_by_monk{m};
-    
-    subplot(2,1,m)
-    hold on
-    
-    for i = 1:length(sessions_to_plot)
-        
-        % Gather info we need
-        sessn = sessions_to_plot(i);
-        outcomes = [Monkeys(m).Sessions(sessn).TrialInfo.OutcomeCode];
-        completed = [Monkeys(m).Sessions(sessn).TrialInfo.Completed];
-        imgs = [Monkeys(m).Sessions(sessn).TrialInfo.ImageID];
-        num_legs_vec = leg_counts{imgs, "leg_count"}';
-        uq_legs_count = 0:4;
-        
-        % Convert trial outcomes into correct or not
-        correct = (outcomes == 1 | outcomes == 2);
-        cat_labeled_as_dog = (outcomes == 3);
-        dog_labeled_as_cat = (outcomes == 4);
-        
-        % Remove error trials to get accurate percent correct count
-        mask = (completed == 1);
-        correct = correct(mask);
-        num_legs_vec = num_legs_vec(mask);
-        cat_labeled_as_dog = cat_labeled_as_dog(mask);
-        dog_labeled_as_cat = dog_labeled_as_cat(mask);
-        
-        % Figure out mean per num legs
-        percent_corr = splitapply(@mean, correct, num_legs_vec + 1);
-        plot(uq_legs_count, percent_corr, "DisplayName", "% correct", "LineWidth", 2)
-        
-        cat_as_dog = splitapply(@mean, cat_labeled_as_dog, num_legs_vec + 1);
-        plot(uq_legs_count, cat_as_dog, "DisplayName", "% cats called dogs", "LineWidth", 2)
-        
-        dog_as_cat = splitapply(@mean, dog_labeled_as_cat, num_legs_vec + 1);
-        plot(uq_legs_count, dog_as_cat, "DisplayName", "% dogs called cats", "LineWidth", 2)
-        
-        ylabel("Percent of all completed trials")
-        xlabel("Num legs")
-        legend()
-        title(Monkeys(m).Name)
-    end
-end
 
 %% Colored text as legend for above plots
 figure

@@ -15,7 +15,8 @@ CCL = '/Users/jonahpearl/Documents/MATLAB/catdog-category-learning';
 % Use this for initial 20/20 PF (exposure control)
 svmRecordPath = 'XMA/Monkey_structs/SVM_Records.mat';
 pv_path = 'XMA/Monkey_structs';
-behav_file = 'Marta_fix_cat_xma_ni.mat';
+% behav_file = 'Marta_fix_cat_xma_ni.mat';
+behav_file = 'Max_fix_cat_xma_ni.mat';
 spikeCountPath = 'XMA/Spike_count_mats';
 figureSavePath = '/Users/jonahpearl/Documents/BJR group/Catdog_paper/20240423_revisions/initial_PF2020';
 
@@ -88,7 +89,8 @@ svm_test_set_idx = 1;
 % General SVM Parameters
 random_seed = 10; % for reproducibility 
 rArrayLocs = {'te'};
-rSessionsByMonk = {1:12};  % (Fig 2B / 2D)
+% rSessionsByMonk = {1:12};  % Marta
+rSessionsByMonk = {1:3};
 ignoreVal = 20; % if neuron has less than this num spikes, do not use it.
 runShuffle = false; % run the shuffled condition?
     nShuffles = 5;
@@ -97,7 +99,7 @@ manuallyReduceIntervals = true; % test a subset of all the intervals for faster 
     manualIntervals = {[75 175], [175 275]}; % NB, also need to change variable fname_base to grab file containing desired intervals
 %     manualIntervals = {[175 275]}; % NB, also need to change variable fname_base to grab file containing desired intervals
     
-    % for SVM timecourses (Fig 2B)
+    % for SVM timecourses 
 %     starts = -100:10:300;
 %     manualIntervals = arrayfun(@(x) [x x+100], starts, 'UniformOutput', false);
 %     ranking_interval = {[175 275]};  % interval to rank units wrt one-D SVM's
@@ -106,7 +108,7 @@ manuallyReduceIntervals = true; % test a subset of all the intervals for faster 
 % more intervals.
 step = 5; % Interval parameters (for loading the correct spike counts file)
 width = 100;
-% X_fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % contains full time-course of spike counts (Fig 2b)
+% X_fname_base = sprintf('%%s_allNeurons_step%d_wd%d.mat', step, width); % contains full time-course of spike counts 
 X_fname_base = sprintf('%%s_allNeurons_variableBin_1.mat'); % contains 75-175, 175-225, 175-275, and 175-350.
 
 % Note that folds are not generated purely randomly -- we impose
@@ -141,11 +143,28 @@ paramStruct = struct('RandomSeed', random_seed,...
 %% Record of ID nums so far
 
 % ID: 63340 -- 75-175 and 175-275 (ranked wrt 175-275). Has 5 shuffles. PF
-% baseline days 1-12.
+% baseline days 1-12. Marta only.
+
+% ID: 590013 -- 175-275, Max, baseline.
 
 % Load record
 fullRecordPath = fullfile(EXT_HD, svmRecordPath);
 load(fullRecordPath, 'Record');
+
+%% Count total num appearances of each image
+
+for m = 1:length(Monkeys)
+    rSessions = rSessionsByMonk{m};
+    
+    img_counts = [];
+    for i = 1:length(rSessions)
+        sessn = rSessions(i);
+        img_counts = [img_counts; [Monkeys(m).Sessions(sessn).CueInfo.NumApp]];
+        
+    end
+    disp(sum(img_counts))
+end
+
 
 %% (skip this if analyzing anew) Find desired SVM data
 
@@ -171,6 +190,7 @@ end
 %% (skip this if analyzing anew) (but useful to load in pre-ranked units) Load SVM data
 
 ID = 63340;
+% ID = 590013;
 
 load(sprintf(fullSVMPath, ID), 'data');
 SVM = data;
@@ -203,8 +223,6 @@ for m = 1:length(Monkeys)
         SVM(m).Sessions(sessn).Session_Y_imageID = Y;
     end
 end
-
-
 
 %% (run once, then save output) Calculate single-unit SVM performance
 
@@ -327,7 +345,7 @@ end
 
 %% Rank units based on single-unit SVM performance
 
-rArrayLocs = {'anterior', 'middle', 'posterior', 'te'};
+% rArrayLocs = {'anterior', 'middle', 'posterior', 'te'};
 
 % Monkeys(m).Sessions(i).GLM_coeffs is (num units) x (num intervals used)
 for m = 1:length(Monkeys)
@@ -707,7 +725,7 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% Plot performance wrt adding units (Fig 2D)
+%% Plot performance wrt adding units
 
 array = 'te';
 rArrayLocs = {'te'};
@@ -782,7 +800,7 @@ rArrayLocs = {'te'};
 
 % base_kfl_name = 'KFL_GLMRanking_Top_%d';
 % base_kfl_name  = 'KFL_SingleUnitSVMRanking_Top_%d';  
-base_kfl_name = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d'; % Fig 2D
+base_kfl_name = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d'; 
 fig_path = '/Users/jonahpearl/Documents/BJR group/Catdog paper/Feb 2023 addtl figs';
 
 % ok this is totally contrived and the fit is very finicky wrt init 
@@ -796,7 +814,7 @@ sigmoid = fittype('a1/(1 + exp(-b1*(x-c1))) + d',...
     'coefficients', {'a1', 'b1', 'c1', 'd'});
 
 manualIntervals = {[175 275]};
-rSessionsByMonk = {[7 9], [6 7]};  % (Fig 2B / 2D)
+rSessionsByMonk = {[7 9], [6 7]};
 lower_n_units_val_by_monk = [3 2];
 
 for m = 1:length(Monkeys)
@@ -930,7 +948,7 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% (before plotting timecourse, ie Fig 2B) Run cluster-based permutation statistics for a given neural subset (ie num units = 50) (fast) (shuffle vs real, pre vs post)
+%% (before plotting timecourse) Run cluster-based permutation statistics for a given neural subset (ie num units = 50) (fast) (shuffle vs real, pre vs post)
 % See: https://www.nature.com/articles/s41593-018-0148-7, "Cluster-based
 % permutation procedure" in methods section.
 
@@ -1064,7 +1082,7 @@ for m = 1:length(Monkeys)
     end
 end
 
-%% Plot timecourse for a given neural subset (Fig 2B)
+%% Plot timecourse for a given neural subset
 
 % Plotting params
 plot_alpha = 0.4; % transparency of sem fill
@@ -1190,18 +1208,18 @@ for m = 1:length(Monkeys)
 %     saveas(gcf, fullfile(figureSavePath, sprintf('pv_SVM_Timecourse_%s_%s_%g', Monkeys(m).Name, sigID, ID)), 'epsc')
 end
 
-%% Plot a given subset/interval over sessions (Fig 2C)
+%% Plot a given subset/interval over sessions
 
 
 interval_to_plot = [175 275];
 % interval_to_plot = [75 175];
 
-% top_n_units = 100;
-% base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
+top_n_units = 100;
+base_kfl_name = sprintf('KFL_SingleUnitSVMRanking_sparsa_Top_%d', top_n_units);  % top 10, 25, 50, or 100
 
-base_kfl_name = 'KFL_sparsa_all';
+% base_kfl_name = 'KFL_sparsa_all';
 
-figure2('Position', [400 400 400 300])
+figure2('Position', [400 400 400 150])
 mkYLims = {[0.5 0.75]};
 
 for m = 1:length(Monkeys)
@@ -1222,7 +1240,7 @@ for m = 1:length(Monkeys)
         % New subplot for each array location
 %         subplot(2, ceil(length(rArrayLocs)/2), iLoc)
 %         nexttile
-        hold on
+%         hold on
 
         % Big TE with smaller arrays underneath
 %         if strcmp(loc, 'te')
@@ -1589,7 +1607,7 @@ output_field_name_template = 'KFL_SingleUnitSVMRanking_sparsa_Top_%d';
 svm_solver = {'sparsa'};
 
 rArrayLocs = {'anterior', 'middle', 'posterior'};
-rSessionsByMonk = {[7 9], [6 7]};  % (Fig 2B / 2D)
+rSessionsByMonk = {[7 9], [6 7]};
 
 runShuffle = false; % run the shuffled condition? obv will slow things down ~(nShuffles)-fold!
 nShuffles = 5;
